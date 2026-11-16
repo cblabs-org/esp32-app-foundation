@@ -44,8 +44,8 @@ work_orders:
   commit_sha: 071ad40234836301e5010938bcbfbe63fcbef86c
 - id: WO-144.2
   slug: wo2-ci-linux-and-scons-fixes
-  title: Fix Linux CI runner, pin PlatformIO 6.1.19, add LVGLDisplay headers, and
-    guard UNIT_TEST EventBus
+  title: Fix Linux CI runner, PlatformIO 6.1.19, LVGLDisplay headers, EventBus tests,
+    and native_ha test_homeassistant
   complexity: standard
   status: PENDING
   attempts: 0
@@ -62,12 +62,12 @@ work_orders:
 
 `PR-144` is executed in two bounded Work Orders:
 - `WO-144.1` (`COMPLETED`) established the initial secret-scan config, platform pins across all three `platformio.ini` manifests, fail-closed web test gate, Playwright list reporter, GitHub Actions workflow, and README badge.
-- `WO-144.2` (`PENDING`) resolves the 4 Linux CI failures surfaced by live GitHub Actions run `43824194345` plus the `LVGLEventBusIntegrationTest` member destruction-order bug uncovered by `_unitMutex` under the amended Charter:
+- `WO-144.2` (`PENDING`) resolves the 4 Linux CI failures surfaced by live GitHub Actions run `43824194345`, the `LVGLEventBusIntegrationTest` member destruction-order bug uncovered by `_unitMutex`, and the `native_ha` `test_homeassistant` compilation/lifetime/millis issues under the amended Charter:
 
 | WO ID | Slug | Title | Complexity | Dependencies |
 | --- | --- | --- | --- | --- |
 | `WO-144.1` | `wo1-ci-and-web-gate` | Add GitHub Actions CI workflows, pin pioarduino platform, and harden run_web_tests.py (#144) | `standard` | Charter locked |
-| `WO-144.2` | `wo2-ci-linux-and-scons-fixes` | Fix Linux CI runner, pin PlatformIO 6.1.19, add LVGLDisplay headers, and guard UNIT_TEST EventBus | `standard` | `WO-144.1`, Charter amended |
+| `WO-144.2` | `wo2-ci-linux-and-scons-fixes` | Fix Linux CI runner, PlatformIO 6.1.19, LVGLDisplay headers, EventBus tests, and native_ha test_homeassistant | `standard` | `WO-144.1`, Charter amended |
 
 ### Sequencing & Architectural Notes
 1. **Secret Scanning Configuration (`.gitleaks.toml`) — `WO-144.1`:** Copy `.gitleaks.toml` verbatim from `launch/pr-a-sensitive-review:.gitleaks.toml` so CI enforces both gitleaks defaults and the bug-fixer egress-gate patterns (`bugfixer-*` rules) with the reviewed vendored/UI allowlists.
@@ -77,7 +77,8 @@ work_orders:
 5. **Linux Runner, PlatformIO `6.1.19` Pin, & Cache Bust (`.github/workflows/ci.yml`) — `WO-144.2`:** Pin `runs-on: ubuntu-24.04` in all 4 jobs (avoiding Playwright `1.60.0` incompatibility on `ubuntu26.04-x64`), pin `pip install "platformio==6.1.19"` in `native-tests` and `firmware-build` (preventing `6.2.0` from overwriting `pioarduino`'s `tool-scons@4.40801.0` with `4.41101.0`), and bump `~/.platformio` cache keys/restore-keys (`-pio-native-v2-`, `-pio-fw-v2-`) so no broken `4.41101.0` cache is restored.
 6. **Linux GCC Header Completeness (`modules/LVGLDisplay/LVGLDisplay.hpp`) — `WO-144.2`:** Add `#include <mutex>` and `#include <vector>` directly after `#include <atomic>` so `std::mutex` and `std::vector` compile under Linux GCC `libstdc++` without relying on macOS transitive headers.
 7. **`UNIT_TEST` Thread Safety & Callback Copy (`modules/EventBus/EventBus.hpp`, `modules/EventBus/EventBus.cpp`) — `WO-144.2`:** Add `#ifdef UNIT_TEST` `#include <mutex>` and `std::recursive_mutex _unitMutex;` in `EventBus.hpp`, acquire `std::lock_guard<std::recursive_mutex> lock(_unitMutex);` in the `#ifdef UNIT_TEST` paths of `begin()`, `cleanup()`, `subscribe()`, `unsubscribe()`, and `publish()`, and copy `EventCallback cb` / `void* ctx` into locals before invoking `cb(topic, payload, ctx);` inside `publish()` (fixing `EventBusTest.CrossTaskSubscribeUnsubscribeConcurrency` `SIGABRT` on Linux `glibc`).
-8. **Test Fixture Destruction Order (`test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp`) — `WO-144.2`:** Declare `EventBus eventBus;` before `LVGLDisplayModule module{adapter};` (matching `test_u8g2Display/test_eventbus_integration.cpp:111-112`) so `~LVGLDisplayModule()` unsubscribes while `eventBus` and `_unitMutex` are still valid. Note: Tier-3 will skip `pa wo verify` per `PA_WO_VERIFY_DOTFILE_BUG` and escalate cleanly with `completion.verification_summary <= 280` chars.
+8. **Test Fixture Destruction Order (`test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp`) — `WO-144.2`:** Declare `EventBus eventBus;` before `LVGLDisplayModule module{adapter};` (matching `test_u8g2Display/test_eventbus_integration.cpp:111-112`) so `~LVGLDisplayModule()` unsubscribes while `eventBus` and `_unitMutex` are still valid.
+9. **`native_ha` `Arduino.h` `millis()` Stub & `HomeAssistantBackoffTest` Fixes (`test/stubs/platform/Arduino.h`, `test/test_unit/test_homeassistant/test_homeassistant.cpp`) — `WO-144.2`:** Replace hardcoded `millis()` with `_arduinoMockMillis()` / `setMockMillis()` / `millis()`, declare `EventBus eventBus;` before `HomeAssistantModule ha;` in `HomeAssistantBackoffTest`, reset `setMockMillis(0)` in `SetUp()`/`TearDown()`, migrate `ha._drainStartMs = 1000` to `ha._drainTimer.setInterval(HomeAssistantModule::DRAIN_STALL_TIMEOUT_MS)` + `ha._drainTimer.reset(1000)`, set `setMockMillis(republishTime)` before `ha.republishDiscovery()` in `RepublishAfterDrainDoesNotFalseStall` with `EXPECT_EQ(ha._drainTimer.getLastFire(), republishTime);`, and verify `native_ha` (`37/37`). Note: Tier-3 will skip `pa wo verify` per `PA_WO_VERIFY_DOTFILE_BUG` and escalate cleanly with `completion.verification_summary <= 280` chars.
 
 ## 4. Outcome & Session Log
 
