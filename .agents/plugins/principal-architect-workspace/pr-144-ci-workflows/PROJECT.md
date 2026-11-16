@@ -64,9 +64,9 @@ work_orders:
   slug: wo4-native-ha-mqtt-odr-fix
   title: Fix C++17 ODR multiple definition of mock_mqtt_publish_return_value in native_ha
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: 2bc1cf510284c9e905b020ec2da07ea4b5e5fe7f
 ---
 
 # PR-144 — ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144)

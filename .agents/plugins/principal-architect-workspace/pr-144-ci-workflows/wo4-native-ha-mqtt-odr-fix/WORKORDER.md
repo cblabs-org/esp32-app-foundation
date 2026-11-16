@@ -4,7 +4,7 @@ wo_id: WO-144.4
 pr_id: PR-144
 title: Fix C++17 ODR multiple definition of mock_mqtt_publish_return_value in native_ha
 complexity: standard
-status: PENDING
+status: COMPLETED
 allowed_files:
 - test/stubs/platform/mqtt_client.h
 - test/test_native/test_homeassistant/test_main.cpp
@@ -18,7 +18,25 @@ verification_command: pytest scripts/tests/ && python3 scripts/doc_lint.py
 max_attempts: 5
 max_structural_failures: 2
 spec_hash: 996d7b06da202b4aa303bf9ce16f69587100e8815cb991c9ac88027a061c8197
-completion: null
+completion:
+  status: COMPLETED
+  attempt_num: 1
+  receipt_id: rcpt_d884534e9ccf
+  commit_sha: 2bc1cf510284c9e905b020ec2da07ea4b5e5fe7f
+  files_modified:
+  - test/stubs/platform/mqtt_client.h
+  - test/test_native/test_homeassistant/test_main.cpp
+  - test/test_unit/test_homeassistant/test_homeassistant.cpp
+  verification_summary: pytest scripts/tests/ (93 passed) & doc_lint.py (exit 0);
+    left unstaged for Coordinator PlatformIO MCP native_ha verification.
+  out_of_scope_findings: []
+  escalation_request: null
+  decisions_made:
+  - Unified mock_mqtt_publish_return_value on the single C++17 inline variable in
+    test/stubs/platform/mqtt_client.h and removed MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED
+    plus strong non-inline definitions from test/test_native/test_homeassistant/test_main.cpp
+    and test/test_unit/test_homeassistant/test_homeassistant.cpp.
+  dead_ends: []
 ---
 
 # WO-144.4 — Fix C++17 ODR multiple definition of mock_mqtt_publish_return_value in native_ha
@@ -63,4 +81,14 @@ Scope is strictly bounded to `test/stubs/platform/mqtt_client.h`, `test/test_nat
 
 ## Completion Report
 
-*(Pending execution by Tier-3 Worker.)*
+Implemented all `WO-144.4` changes strictly within `allowed_files` and left all edits unstaged for Coordinator PlatformIO MCP `native_ha` verification and central receipt stamping (`pa wo verify` / `git commit` not run by worker per dispatch instructions):
+
+- **`test/stubs/platform/mqtt_client.h` (`L83-L84`):** Removed `#ifndef MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED` and `#endif`, leaving unconditional `inline int mock_mqtt_publish_return_value = 0;`.
+- **`test/test_native/test_homeassistant/test_main.cpp` (`L1-L10`):** Deleted `#define MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED` and `int mock_mqtt_publish_return_value = 0;`, keeping clean whitespace before `#include <gtest/gtest.h>`.
+- **`test/test_unit/test_homeassistant/test_homeassistant.cpp` (`L1-L10`):** Deleted `#define MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED` and `int mock_mqtt_publish_return_value = 0;`, keeping clean whitespace before `#include <gtest/gtest.h>` while preserving all `mock_mqtt_publish_return_value` references in `HomeAssistantBackoffTest`.
+
+### Verification Results
+- `pytest scripts/tests/`: `93 passed` (exit `0`).
+- `python3 scripts/doc_lint.py`: exit `0`.
+- `git diff --cached --name-only`: empty (all changes unstaged).
+- PlatformIO MCP `native_ha` test suite & `pa wo verify`: deferred to Coordinator per handoff (`ESCALATED_TO_PA`).

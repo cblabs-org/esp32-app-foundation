@@ -5,9 +5,6 @@
  * Description: Implementation of HomeAssistantTest, HomeAssistantBackoffTest classes.
  */
 
-#define MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED
-int mock_mqtt_publish_return_value = 0;
-
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
 
