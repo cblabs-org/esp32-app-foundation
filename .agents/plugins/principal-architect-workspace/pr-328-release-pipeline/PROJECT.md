@@ -28,9 +28,9 @@ work_orders:
   title: Fix split-repo slug inference, risk-floor pruning/URL normalization, pagination
     default, and unit tests
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: 1a0916c7ae36d0eaabc2df149283f650d5e39300
 ---
 
 # PR-328 — fix(release): infer split-repo slug from releases_dir and prune sub-floor manifest channels

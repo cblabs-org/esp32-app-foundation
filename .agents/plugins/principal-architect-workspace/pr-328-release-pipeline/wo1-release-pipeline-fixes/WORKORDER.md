@@ -5,7 +5,7 @@ pr_id: PR-328
 title: Fix split-repo slug inference, risk-floor pruning/URL normalization, pagination
   default, and unit tests
 complexity: standard
-status: PENDING
+status: COMPLETED
 allowed_files:
 - scripts/deploy_release.py
 - scripts/test_ota_pagination.py
@@ -20,7 +20,21 @@ verification_command: pytest scripts/tests/ && python3 scripts/doc_lint.py
 max_attempts: 5
 max_structural_failures: 2
 spec_hash: 2703f1d3fbe017be16667fe06e7713b5c68966946c36f041cc6e8f9c8de8bbca
-completion: null
+completion:
+  status: COMPLETED
+  attempt_num: 1
+  receipt_id: rcpt_465446788d19
+  commit_sha: 1a0916c7ae36d0eaabc2df149283f650d5e39300
+  files_modified:
+  - scripts/deploy_release.py
+  - scripts/test_ota_pagination.py
+  - scripts/tests/test_deploy_release.py
+  verification_summary: 'pytest scripts/tests/ && python3 scripts/doc_lint.py: =============================
+    136 passed in 0.80s =============================='
+  out_of_scope_findings: []
+  escalation_request: null
+  decisions_made: []
+  dead_ends: []
 ---
 
 # WO-328.1 — Fix split-repo slug inference, risk-floor pruning/URL normalization, pagination default, and unit tests

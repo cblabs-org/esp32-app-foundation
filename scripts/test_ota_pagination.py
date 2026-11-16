@@ -1,13 +1,22 @@
-import sys
-import json
-import subprocess
 import argparse
+import json
+import os
+import subprocess
+import sys
 
-def fetch_page(per_page, page):
-    # Fetch from GH API. We unset GITHUB_TOKEN to avoid 'Bad credentials' if token is invalid,
-    # ensuring we hit the public endpoint.
-    cmd = f'unset GITHUB_TOKEN && gh api "/repos/cblabs-org/esp32-app-foundation/releases?per_page={per_page}&page={page}"'
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+DEFAULT_REPO = "cblabs-org/esp32-app-foundation-releases"
+
+
+def fetch_page(per_page, page, repo=DEFAULT_REPO):
+    # Fetch from GH API without GITHUB_TOKEN to avoid 'Bad credentials' on public endpoints.
+    env = {k: v for k, v in os.environ.items() if k != "GITHUB_TOKEN"}
+    endpoint = f"/repos/{repo}/releases?per_page={per_page}&page={page}"
+    result = subprocess.run(
+        ["gh", "api", endpoint],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
     if result.returncode != 0:
         # Check if it's just an empty array or an error
         if result.stdout.strip() == "[]":
@@ -56,7 +65,7 @@ def get_channel_floor(chan_str):
     if chan_str == 'rc': return 3
     return 255
 
-def simulate_ota(local_tag, target_channel='dev', per_page=1, max_pages=20):
+def simulate_ota(local_tag, target_channel='dev', per_page=1, max_pages=20, repo=DEFAULT_REPO):
     current_version = parse_version(local_tag)
     floor = get_channel_floor(target_channel)
     
@@ -65,6 +74,7 @@ def simulate_ota(local_tag, target_channel='dev', per_page=1, max_pages=20):
     stop_scanning = False
     
     print(f"=== OTA Simulation ===")
+    print(f"Target Repo   : {repo}")
     print(f"Local version : {local_tag}")
     print(f"Target Channel: {target_channel} (floor value {floor})")
     print(f"Pagination    : per_page={per_page}, max_pages={max_pages}\n")
@@ -74,7 +84,7 @@ def simulate_ota(local_tag, target_channel='dev', per_page=1, max_pages=20):
             break
             
         print(f"--> Requesting page {page}...")
-        releases = fetch_page(per_page, page)
+        releases = fetch_page(per_page, page, repo=repo)
         
         if releases is None or len(releases) == 0:
             print(f"    Empty page {page} — stopping scan")
@@ -123,6 +133,7 @@ if __name__ == "__main__":
     parser.add_argument("--channel", default="dev", help="Target channel (dev, beta, stable)")
     parser.add_argument("--per-page", type=int, default=1, help="Results per page")
     parser.add_argument("--pages", type=int, default=20, help="Max pages to scan")
+    parser.add_argument("--repo", default=DEFAULT_REPO, help=f"GitHub repo slug (default: {DEFAULT_REPO})")
     
     args = parser.parse_args()
-    simulate_ota(args.local, args.channel, args.per_page, args.pages)
+    simulate_ota(args.local, args.channel, args.per_page, args.pages, repo=args.repo)
