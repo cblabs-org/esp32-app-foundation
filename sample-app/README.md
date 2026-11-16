@@ -217,7 +217,7 @@ pio test -e native
    ```
 2. **Add the foundation as a submodule:**
    ```bash
-   git submodule add https://github.com/matthewmcneill/esp32-app-foundation.git lib/esp32-app-foundation
+   git submodule add https://github.com/cblabs-org/esp32-app-foundation.git lib/esp32-app-foundation
    git submodule update --init --recursive
    ```
 3. **Copy the sample app files:**

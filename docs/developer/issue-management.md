@@ -68,13 +68,13 @@ Found by: <program>, <PR or session>
 ```bash
 # Create the found-by label for your consumer program if it doesn't exist yet:
 gh label create "found-by:<program>" \
-  --repo matthewmcneill/esp32-app-foundation \
+  --repo cblabs-org/esp32-app-foundation \
   --color "a855f7" \
   --description "Reported by the <Program> consumer"
 
 # Then file the issue:
 gh issue create \
-  --repo matthewmcneill/esp32-app-foundation \
+  --repo cblabs-org/esp32-app-foundation \
   --title "[Module] Description" \
   --body-file issue-body.md \
   --label "P2-correctness,upstream-issue,found-by:<program>"
@@ -100,9 +100,9 @@ If a bug was fixed before a GitHub issue was filed:
 ```bash
 NUM=$(gh issue create --title "..." --body-file body.md \
   --label "P1-blocker,upstream-issue,found-by:<program>,backfill" \
-  --repo matthewmcneill/esp32-app-foundation | grep -oE '[0-9]+$')
+  --repo cblabs-org/esp32-app-foundation | grep -oE '[0-9]+$')
 
-gh issue close "$NUM" --repo matthewmcneill/esp32-app-foundation \
+gh issue close "$NUM" --repo cblabs-org/esp32-app-foundation \
   --reason completed \
   --comment "Resolved in commit \`<SHA>\`, merged <date>."
 ```
@@ -115,7 +115,7 @@ Once a framework issue is filed, slim any consumer-side audit entry to:
 
 ```markdown
 ## [Area] Title [OPEN / CLOSED]
-- **Framework issue:** [#N](https://github.com/matthewmcneill/esp32-app-foundation/issues/N)
+- **Framework issue:** [#N](https://github.com/cblabs-org/esp32-app-foundation/issues/N)
 - **Status:** Resolved in `<SHA>` — OR — Open, workaround: <text>
 ```
 

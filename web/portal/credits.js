@@ -56,7 +56,7 @@
     'border-top:1px solid var(--card-border,rgba(255,255,255,0.08));' +
     'font-size:0.9em;opacity:0.8;text-align:center;">';
   html += 'Built with <strong>ESP32 App Foundation</strong> by CB Labs &mdash; ';
-  html += '<a href="https://github.com/matthewmcneill/esp32-app-foundation" ' +
+  html += '<a href="https://github.com/cblabs-org/esp32-app-foundation" ' +
     'target="_blank" rel="noopener noreferrer" style="color:var(--primary);">' +
     'View on GitHub</a>';
   html += '</div>';

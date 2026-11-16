@@ -659,7 +659,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--repo",
         help="Target GitHub repo for releases AND the manifest (owner/repo "
-             "format, e.g. 'matthewmcneill/esp32-firmware-releases'). "
+             "format, e.g. 'cblabs-org/esp32-firmware-releases'). "
              "In single-repo mode (default), this is the current repo's origin. "
              "In split-repo mode, pass the public releases repo.",
     )

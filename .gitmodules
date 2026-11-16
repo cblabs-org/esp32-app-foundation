@@ -1,15 +1,6 @@
 [submodule ".agents/skills/embedded-systems"]
 	path = .agents/skills/embedded-systems
 	url = https://github.com/mm-skills/embedded-systems
-[submodule ".agents/skills/oo-expert"]
-	path = .agents/skills/oo-expert
-	url = https://github.com/mm-skills/oo-expert
-[submodule ".agents/skills/house-style-docs"]
-	path = .agents/skills/house-style-docs
-	url = https://github.com/mm-skills/house-style-docs
-[submodule ".agents/skills/pio-manager"]
-	path = .agents/skills/pio-manager
-	url = https://github.com/mm-skills/pio-manager
 [submodule ".agents/skills/squareline-studio-expert"]
 	path = .agents/skills/squareline-studio-expert
 	url = https://github.com/mm-skills/squareline-studio-expert

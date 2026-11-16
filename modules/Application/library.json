@@ -5,7 +5,7 @@
   "keywords": ["esp32", "framework", "application"],
   "repository": {
     "type": "git",
-    "url": "https://github.com/matthewmcneill/esp32-app-foundation"
+    "url": "https://github.com/cblabs-org/esp32-app-foundation"
   },
   "dependencies": {
     "EventBus": "*",

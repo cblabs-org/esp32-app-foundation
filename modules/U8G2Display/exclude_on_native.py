@@ -1,6 +1,6 @@
 #
 # ESP32 App Foundation (c) 2026 CB Labs
-# https://github.com/matthewmcneill/esp32-app-foundation
+# https://github.com/cblabs-org/esp32-app-foundation
 #
 # Library build hook for U8G2Display — owns the src filter so it can be made
 # environment-conditional (library.json srcFilter is static).

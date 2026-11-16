@@ -61,9 +61,13 @@ include/otaSecrets.hpp
 
 # Harness-local files that resolve into .agents via the .claude symlink
 .agents/settings.local.json
+.agents/tmp/
+
+# Machine-local MCP server config (copy .mcp.example.json to start)
+.mcp.json
 .DS_Store
 tmp/
-scripts/__pycache__/
+.pytest_cache/
 sample-app/myenv/
 sample-app/*.log
 sample-app/monitor_out.txt

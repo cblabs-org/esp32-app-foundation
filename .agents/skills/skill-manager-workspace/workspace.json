@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "library": "/Users/mcneillm/.gemini/skill-library",
+  "library": "~/.gemini/skill-library",
   "skills": {
     "embedded-systems": {
       "type": "authored",
@@ -9,18 +9,6 @@
         "path": "skills/embedded-systems"
       },
       "importedAt": "2026-05-15T23:13:02Z"
-    },
-    "oo-expert": {
-      "type": "forked",
-      "origin": {
-        "repo": "unknown",
-        "branch": "unknown",
-        "path": "oo-expert",
-        "pinnedHash": null,
-        "forkedFromHash": null,
-        "forkedAt": "2026-05-15T23:19:02Z"
-      },
-      "importedAt": "2026-05-15T23:19:02Z"
     },
     "principal-architect": {
       "type": "imported",
@@ -49,11 +37,6 @@
         "forkedAt": "2026-06-15T17:06:57Z"
       },
       "importedAt": "2026-05-15T22:32:44Z"
-    },
-    "house-style-docs": {
-      "type": "authored",
-      "origin": null,
-      "importedAt": "2026-05-15T23:16:04Z"
     },
     "systematic-debugging": {
       "type": "imported",

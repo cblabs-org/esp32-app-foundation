@@ -1,7 +1,7 @@
 /*
  * ESP32 App Foundation (c) 2026 CB Labs
  *
- * https://github.com/matthewmcneill/esp32-app-foundation
+ * https://github.com/cblabs-org/esp32-app-foundation
  *
  * Module: test/test_unit/test_application/application_impl.cpp
  * Description: Unity-build shim that directly includes Application.cpp into

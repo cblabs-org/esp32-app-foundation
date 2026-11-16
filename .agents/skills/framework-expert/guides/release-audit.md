@@ -110,8 +110,7 @@ require agent analysis or hardware measurement.
 
 **Applies to:** both framework and consumer
 
-Reference: [cpp-embedded.md](../../house-style-docs/references/cpp-embedded.md),
-[style-guide.md](../coding-patterns/style-guide.md)
+Reference: [style-guide.md](../coding-patterns/style-guide.md)
 
 | Check | Evidence |
 |---|---|

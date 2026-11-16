@@ -18,6 +18,7 @@ Decision matrix:
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -56,6 +57,33 @@ def _git(args, cwd):
         return r.returncode == 0, r.stdout.strip()
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False, ""
+
+
+def _next_dev_tag(project_dir):
+    """Returns (next dev tag, opens_new_series) via scripts/next_version.py, or (None, False).
+
+    Looks in the framework checkout this hook lives in (resolving any
+    .agents symlink from a consumer repo) and then in the project itself.
+    """
+    candidates = [
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "scripts"),
+        os.path.join(project_dir, "scripts"),
+    ]
+    for scripts_dir in candidates:
+        if not os.path.isfile(os.path.join(scripts_dir, "next_version.py")):
+            continue
+        try:
+            sys.path.insert(0, os.path.abspath(scripts_dir))
+            import next_version
+            from semver_tags import list_versions
+
+            versions = list_versions(project_dir)
+            nxt = next_version.compute_next(versions, "dev")
+            top = max(versions, key=lambda v: v.key) if versions else None
+            return nxt.tag, top is not None and nxt.core != top.core
+        except Exception:
+            return None, False
+    return None, False
 
 
 def main():
@@ -113,29 +141,28 @@ def main():
         _allow(f"HEAD matches tag {nearest} (zero commits ahead)")
 
     if commit_count > 0:
-        # Parse the nearest tag to suggest the next dev number
-        m = re.match(
-            r"^[vV]?(\d+\.\d+\.\d+)(?:-(dev|beta|rc)(?:\.(\d+))?)?$",
-            nearest.strip(),
-        )
-        if m:
-            base_ver = m.group(1)
-            channel = m.group(2) or "dev"
-            pre_num = int(m.group(3)) if m.group(3) else 0
-
-            if channel == "dev":
-                next_tag = f"v{base_ver}-dev.{pre_num + 1}"
-            else:
-                # If last tag was beta/rc/stable, start a new dev series
-                next_tag = f"v{base_ver}-dev.1"
+        next_tag, new_series = _next_dev_tag(project_dir)
+        if next_tag is None:
+            how = (
+                "Work out the next tag with:\n"
+                "  python3 scripts/next_version.py --channel dev"
+            )
+        elif new_series:
+            how = (
+                f"The next dev tag is {next_tag}, which opens a new PATCH series — "
+                f"ask the user before tagging (rule 03). Once approved:\n"
+                f"  python3 scripts/next_version.py --channel dev --tag --push --new-series"
+            )
         else:
-            next_tag = "<next-dev-tag>"
+            how = (
+                "Tag before flashing (dev tags within the current series are autonomous):\n"
+                f"  python3 scripts/next_version.py --channel dev --tag --push   # → {next_tag}"
+            )
 
         _deny(
             f"⛔ FLASH BLOCKED: HEAD is {commit_count} commit(s) ahead of "
             f"'{nearest}' with no new tag.\n"
-            f"Tag before flashing (dev tags are autonomous — no user approval needed):\n"
-            f"  git tag {next_tag} && git push origin {next_tag}\n"
+            f"{how}\n"
             f"Then REBUILD so inject_version.py bakes in the new version, "
             f"and re-attempt the flash.\n"
             f"Sequence: Tag → Build → Flash. Never flash an untagged build."

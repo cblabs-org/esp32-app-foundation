@@ -43,7 +43,7 @@ pio run -e esp32dev
 1. Create a new repository for your project
 2. Add the framework as a Git submodule:
    ```bash
-   git submodule add https://github.com/matthewmcneill/esp32-app-foundation.git lib/esp32-app-foundation
+   git submodule add https://github.com/cblabs-org/esp32-app-foundation.git lib/esp32-app-foundation
    ```
 3. Copy the contents of this directory to your project root
 4. Update `platformio.ini` paths — replace `../` with `lib/esp32-app-foundation/`:

@@ -175,7 +175,7 @@ Shall I go ahead and set up the project?
 ### Step 1 — Clone the framework
 
 ```bash
-git clone https://github.com/matthewmcneill/esp32-app-foundation.git framework/
+git clone https://github.com/cblabs-org/esp32-app-foundation.git framework/
 ```
 
 This places the entire framework repository into a `framework/` subdirectory
@@ -238,7 +238,7 @@ directory so `#include "AppFoundation.h"` resolves at build time.
 ```ini
 ; =============================================================================
 ; <AppName> — PlatformIO Configuration
-; Built on ESP32 App Foundation (https://github.com/matthewmcneill/esp32-app-foundation)
+; Built on ESP32 App Foundation (https://github.com/cblabs-org/esp32-app-foundation)
 ; =============================================================================
 
 [platformio]

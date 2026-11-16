@@ -6,15 +6,18 @@
 > Building for compilation testing is fine without tagging.
 > But **before flashing to hardware**, if the firmware includes **any** new
 > functionality since the last tag:
-> 1. Check the current highest tag: `git tag --list 'v*' --sort=-version:refname | head -1`
-> 2. **Parse the channel** of that tag (`dev`, `beta`, `rc`, or stable/none):
->    - **If `dev`:** Increment the dev PRE_NUM within the same PATCH:
->      `git tag v0.X.Y-dev.(N+1) && git push origin v0.X.Y-dev.(N+1)`
+> 1. Get the next tag from the script — **never work it out by hand**
+>    (`git tag --sort=-version:refname` ranks `dev` above `beta` and gives
+>    the wrong answer):
+>    `python3 scripts/next_version.py --fetch --channel dev`
+> 2. Tag it:
+>    - **Same PATCH as the current highest tag** (continuing a dev series):
+>      `python3 scripts/next_version.py --channel dev --tag --push`.
 >      This is **autonomous** — `dev` tags do not require user approval.
->    - **If `beta`, `rc`, or stable (no suffix):** The current PATCH is
->      **closed**. A dev tag within this PATCH would be a version regression.
->      **STOP and ask the user** what the next version should be (e.g.
->      `v0.X.(Y+1)-dev.1`). Incrementing PATCH requires user approval.
+>    - **Opens a new PATCH** (the highest tag is a `beta`, `rc` or stable, so
+>      that PATCH is closed): the script refuses to tag. **STOP and ask the
+>      user** to approve the suggested tag; once they do, re-run with
+>      `--new-series`. Incrementing PATCH requires user approval.
 > 3. Rebuild (so `inject_version.py` picks up the new tag at compile time)
 > 4. **Then** flash.
 >
@@ -32,8 +35,8 @@ Before calling `upload_firmware`, `agent_flash_monitor_verify`, or any
 esptool/OTA upload command, stop and verify:
 
 - [ ] Does this firmware contain new functionality since the last `dev` tag?
-- [ ] If yes: is the highest tag a `dev` tag, or has the PATCH graduated to `beta`/`stable`?
-- [ ] If graduated: have I asked the user for the next version number?
+- [ ] If yes: what does `python3 scripts/next_version.py --channel dev` say?
+- [ ] If it opens a new PATCH: have I asked the user to approve it?
 - [ ] Have I tagged, pushed, **and rebuilt** so the version is baked in?
 - [ ] `curl /api/system` after boot — does `firmware_version` match the new tag?
 

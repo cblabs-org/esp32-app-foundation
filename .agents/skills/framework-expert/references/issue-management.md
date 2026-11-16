@@ -6,7 +6,7 @@
 
 # Issue Management Process
 
-GitHub Issues on **`matthewmcneill/esp32-app-foundation`** are the canonical
+GitHub Issues on **`cblabs-org/esp32-app-foundation`** are the canonical
 system of record for all framework defects. This document tells you everything
 you need to raise, track, link, and close a framework issue.
 
@@ -104,7 +104,7 @@ Found by: <your-program-name>, <PR or session context>
 
 ```bash
 gh issue create \
-  --repo matthewmcneill/esp32-app-foundation \
+  --repo cblabs-org/esp32-app-foundation \
   --title "[Module] Description" \
   --body-file issue-body.md \
   --label "P2-correctness,upstream-issue,found-by:<your-program-name>"
@@ -115,7 +115,7 @@ If the label does not exist on the repo yet, create it first:
 
 ```bash
 gh label create "found-by:<your-program-name>" \
-  --repo matthewmcneill/esp32-app-foundation \
+  --repo cblabs-org/esp32-app-foundation \
   --color "a855f7" \
   --description "Reported by the <Your Program> consumer"
 ```
@@ -145,7 +145,7 @@ consumer side — the framework issue is the source of truth.
 
 ```markdown
 ## [Area] One-line title [OPEN]
-- **Framework issue:** [#N](https://github.com/matthewmcneill/esp32-app-foundation/issues/N)
+- **Framework issue:** [#N](https://github.com/cblabs-org/esp32-app-foundation/issues/N)
 - **Workaround:** <describe any local workaround in use, or "none">
 ```
 
@@ -153,7 +153,7 @@ consumer side — the framework issue is the source of truth.
 
 ```markdown
 ## [Area] One-line title [CLOSED]
-- **Framework issue:** [#N](https://github.com/matthewmcneill/esp32-app-foundation/issues/N)
+- **Framework issue:** [#N](https://github.com/cblabs-org/esp32-app-foundation/issues/N)
 - **Resolved:** framework commit `<SHA>`, merged in PR #M
 ```
 
@@ -175,13 +175,13 @@ issue number without leaving a ghost open issue on the board.
 ```bash
 # Create a backfill issue and immediately close it
 NUM=$(gh issue create \
-  --repo matthewmcneill/esp32-app-foundation \
+  --repo cblabs-org/esp32-app-foundation \
   --title "[Module] Description" \
   --body-file body.md \
   --label "P1-blocker,upstream-issue,found-by:<your-program-name>,backfill" | grep -oE '[0-9]+$')
 
 gh issue close "$NUM" \
-  --repo matthewmcneill/esp32-app-foundation \
+  --repo cblabs-org/esp32-app-foundation \
   --reason completed \
   --comment "Resolved in commit \`<SHA>\` (merged in PR #M, <date>)."
 ```

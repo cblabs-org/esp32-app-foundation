@@ -15,15 +15,15 @@
   "authors": [
     {
       "name": "CB Labs",
-      "url": "https://github.com/matthewmcneill"
+      "url": "https://github.com/cblabs-org"
     }
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/matthewmcneill/esp32-app-foundation"
+    "url": "https://github.com/cblabs-org/esp32-app-foundation"
   },
-  "license": "CC-BY-NC-SA-4.0",
-  "homepage": "https://github.com/matthewmcneill/esp32-app-foundation",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/cblabs-org/esp32-app-foundation",
   "export": {
     "include": [
       "include",

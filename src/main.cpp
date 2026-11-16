@@ -1,7 +1,7 @@
 /*
  * ESP32 App Foundation (c) 2026 CB Labs
  *
- * https://github.com/matthewmcneill/esp32-app-foundation
+ * https://github.com/cblabs-org/esp32-app-foundation
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -104,7 +104,7 @@ static DiagnosticsBoard diagnosticsBoard{256, 64};
  */
 void setup() {
     FrameworkConfig config;
-    config.otaManifestUrl = "https://raw.githubusercontent.com/matthewmcneill/esp32-app-foundation-releases/main/manifest.json";
+    config.otaManifestUrl = "https://raw.githubusercontent.com/cblabs-org/esp32-app-foundation-releases/main/manifest.json";
 #ifdef HAS_OTA_PUBLIC_KEY
     config.otaPublicKey = (const char*)public_key_pem;
 #endif

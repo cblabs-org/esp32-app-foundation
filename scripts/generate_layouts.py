@@ -2,7 +2,7 @@
 """
 ESP32 App Foundation (c) 2026 CB Labs
 
-https://github.com/matthewmcneill/esp32-app-foundation
+https://github.com/cblabs-org/esp32-app-foundation
 
 SPDX-License-Identifier: Apache-2.0
 
@@ -189,7 +189,7 @@ def generate_header(data, output_path):
     lines.append("/*")
     lines.append(" * ESP32 App Foundation (c) 2026 CB Labs")
     lines.append(" *")
-    lines.append(" * https://github.com/matthewmcneill/esp32-app-foundation")
+    lines.append(" * https://github.com/cblabs-org/esp32-app-foundation")
     lines.append(" *")
     lines.append(" * SPDX-License-Identifier: Apache-2.0")
     lines.append(" *")
