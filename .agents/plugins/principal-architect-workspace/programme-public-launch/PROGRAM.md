@@ -29,6 +29,8 @@ prs:
   - test/stubs/platform/Arduino.h
   - test/test_unit/test_homeassistant/test_homeassistant.cpp
   - test/stubs/platform/portal_assets/
+  - test/stubs/platform/mqtt_client.h
+  - test/test_native/test_homeassistant/test_main.cpp
   required_skills: []
   status: GRADUATED
   github_pr: null
@@ -66,4 +68,4 @@ Single-PR programme targeting `launch/pr-e-ci-workflows` (based on `launch/pr-d-
 ## 3. Programme Session Log
 
 - **2026-11-15 (Tier 1 Chief Architect):** Programme `prog-public-launch` initialized on base branch `launch/pr-d-readme-community`. Authored and locked Part I PR Charter for `PR-144` (`pr-144-ci-workflows`, branch `launch/pr-e-ci-workflows`) resolving issue #144. Dispatched to Tier 2 Principal Architect.
-- **2026-11-16 (Tier 1 Chief Architect):** `PR-144` successfully executed Work Orders `WO-144.1` and `WO-144.2` (Linux CI runner pinning to `ubuntu-24.04`, `platformio==6.1.19`, `LVGLDisplay` headers, `EventBus` unit test mutex, fixture destruction order, and `native_ha` `test_homeassistant` stubs), passed Step 6A Cold-Firewall Audit Round 2 (`49af3a5c`, `APPROVED`), and graduated via `c5fd631a`. Programme `prog-public-launch` is completed (`status: COMPLETED`).
+- **2026-11-16 (Tier 1 Chief Architect):** `PR-144` successfully executed Work Orders `WO-144.1`, `WO-144.2`, and `WO-144.3` (portal asset native stubs, `lvgl@9.5.0` & `LovyanGFX@1.2.26` pins, and `CMD_ROTATE` guard), passed Step 6A Cold-Firewall Audit Round 3 (`11fb8be5`, `APPROVED`), and graduated via `bd9c487a`. Programme `prog-public-launch` is completed (`status: COMPLETED`).
