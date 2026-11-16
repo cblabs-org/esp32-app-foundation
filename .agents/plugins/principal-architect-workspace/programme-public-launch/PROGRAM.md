@@ -26,6 +26,8 @@ prs:
   - modules/EventBus/EventBus.hpp
   - modules/EventBus/EventBus.cpp
   - test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp
+  - test/stubs/platform/Arduino.h
+  - test/test_unit/test_homeassistant/test_homeassistant.cpp
   required_skills: []
   status: GRADUATED
   github_pr: null

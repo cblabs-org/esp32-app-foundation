@@ -23,11 +23,13 @@ charter:
   - modules/EventBus/EventBus.hpp
   - modules/EventBus/EventBus.cpp
   - test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp
+  - test/stubs/platform/Arduino.h
+  - test/test_unit/test_homeassistant/test_homeassistant.cpp
   required_skills: []
   verification_floor:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
-  charter_hash: 40b25240b17873905045c9e596e496371221f36249ff24d7d49bfe5cc73929d8
+  charter_hash: fe3a01b7d56d7610e788362b6518dcdf6af1bd6d13ee53d77ce4443545aef411
 status: APPROVED
 approved_at: '2026-11-15T23:45:43.180039Z'
 github_pr: null
