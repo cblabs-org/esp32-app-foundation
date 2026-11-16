@@ -28,7 +28,7 @@ charter:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
   charter_hash: 623ba85903ba87ad4fc3639f6a08fefee3c6c4837a9e10489e6c71f5aa6db01a
-status: CHANGES_REQUESTED
+status: APPROVED
 approved_at: '2026-11-16T16:16:34.909021Z'
 github_pr: null
 work_orders:
@@ -47,6 +47,13 @@ work_orders:
   status: COMPLETED
   attempts: 1
   commit_sha: 3a4ba4b9c6d4b5151957af20f502ce70febc131b
+- id: WO-327.3
+  slug: wo3-audit-r1-fixes
+  title: Remediate Round 1 audit findings in docs/release-audits/v1.0.0-beta.1.md
+  complexity: standard
+  status: PENDING
+  attempts: 0
+  commit_sha: null
 ---
 
 # PR-327 — chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment
@@ -57,12 +64,13 @@ work_orders:
 
 ## 3. Implementation Plan & Work Order Breakdown
 
-`PR-327` is executed in two sequential, non-overlapping Work Orders on branch `launch/pr-b-release-audit` (base: `launch/pr-e-ci-workflows`):
+`PR-327` is executed in three sequential, non-overlapping Work Orders on branch `launch/pr-b-release-audit` (base: `launch/pr-e-ci-workflows`):
 
 | WO ID | Slug | Title | Complexity | Dependencies |
 | --- | --- | --- | --- | --- |
 | `WO-327.1` | `wo1-audit-remediations` | Remediate DeviceCrypto CWE-354 PKCS#7 padding, OTA comments, esp32s3nano alignment, and CHANGELOG | `standard` | Charter locked |
 | `WO-327.2` | `wo2-release-audit-report` | Author v1.0.0-beta.1 10-dimension release audit report with bench soak telemetry | `standard` | `WO-327.1` |
+| `WO-327.3` | `wo3-audit-r1-fixes` | Remediate Round 1 audit findings in docs/release-audits/v1.0.0-beta.1.md | `standard` | `WO-327.2`, Round 1 Audit |
 
 ### Sequencing & Architectural Notes
 1. **Pre-Audit Security, PlatformIO, & Documentation Remediations — `WO-327.1`:**
@@ -76,6 +84,8 @@ work_orders:
    - Run `bash .agents/skills/framework-expert/scripts/release-audit-checks.sh .` after `WO-327.1` lands and author `docs/release-audits/v1.0.0-beta.1.md` following `.agents/skills/framework-expert/guides/release-audit.md` across all 10 dimensions (`🟢 MEASURED`, `🟡 MECHANICAL`, `🟠 TRACED`, `🔴 JUDGED`).
    - Document the `WO-327.1` remediations, report remaining advisory findings honestly (D1 `117` struct/DTO naming hits, D2 `DataManager.hpp:324` `std::function` test/queue seam, D6 `41` hex literals), accurately distinguish `esp32s3nano` `🟢 MEASURED` bench soak telemetry from `crowpanel-128-rotary` `🟡 MECHANICAL` build-only coverage, and enforce strict redaction (`<device-ip>`, `<home-ssid>`, `<device-wifi-mac>`, zero personal paths).
    - Optionally refine `CHANGELOG.md` `[1.0.0-beta.1]` if cross-linking the audit report is helpful.
+3. **Round 1 Cold-Firewall Audit Remediations — `WO-327.3`:**
+   - Remediate `BLOCKING-1` (`docs/release-audits/v1.0.0-beta.1.md:164`: replace `python3 scripts/next_version.py --channel beta` with `python3 scripts/next_version.py --channel beta --bump major` (or `--target 1.0.0`) before `git tag v1.0.0-beta.1 && git push origin v1.0.0-beta.1`), all 4 items of `NON-BLOCKING-1` (`CHANGELOG.md` line ranges `10-90`, `54-59`, `62-64`, D6 `hardcoded_hex_color` `33` non-defect sub-counts, D8 `duplicate_driver_registration` `7`-file breakdown, and D7 pre-`WO-327.1` `crowpanel-128-rotary` local build timing), and reconcile the Verdict advisory summary at `L158` with the 10-row Findings table (`NON-BLOCKING-2` repaired in `wo2-release-audit-report/WORKORDER.md`).
 
 ## 4. Outcome & Session Log
 
