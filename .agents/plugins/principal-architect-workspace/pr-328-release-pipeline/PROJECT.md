@@ -19,7 +19,7 @@ charter:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
   charter_hash: c739fe159bdd2cf4d3bb80e36d23a39eac4b7ade5cc216ed6b003545d3457b05
-status: AUDIT_APPROVED
+status: GRADUATED
 approved_at: '2026-11-16T21:04:19.329526Z'
 github_pr: null
 work_orders:
@@ -95,3 +95,15 @@ work_orders:
 - `python3 scripts/doc_lint.py`: exit `0`
 - Legacy maintainer username check across `scripts/`: `0` matches (`CLEAN`)
 - `git -C releases diff`: only `README.md` line 5 modified (uncommitted in nested checkout)
+
+<!-- pa:graduation-summary start -->
+### Graduation Summary (`PR-328` / `pr-328-release-pipeline` — `GRADUATED`)
+
+- **Completed Date:** 2026-11-16
+- **Graduation Mode:** `builtin`
+- **Latest Audit:** Round 1 — `APPROVED` (`01540bf1a171`)
+
+| WO-ID | Status | Attempts | Commit SHA |
+|---|---|---|---|
+| WO-328.1 | COMPLETED | 1 | `4f621a64054e` |
+<!-- pa:graduation-summary end -->

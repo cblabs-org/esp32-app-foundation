@@ -72,7 +72,7 @@ prs:
   - scripts/tests/test_deploy_release.py
   - releases/README.md
   required_skills: []
-  status: PLANNED
+  status: GRADUATED
   github_pr: null
 ---
 
