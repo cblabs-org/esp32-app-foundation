@@ -25,11 +25,12 @@ charter:
   - test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp
   - test/stubs/platform/Arduino.h
   - test/test_unit/test_homeassistant/test_homeassistant.cpp
+  - test/stubs/platform/portal_assets/
   required_skills: []
   verification_floor:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
-  charter_hash: fe3a01b7d56d7610e788362b6518dcdf6af1bd6d13ee53d77ce4443545aef411
+  charter_hash: 50adb02e22b9534a5ba2c5c499a44d093cd0b76e004ecf7633fded73a8a8f481
 status: GRADUATED
 approved_at: '2026-11-15T23:45:43.180039Z'
 github_pr: null
