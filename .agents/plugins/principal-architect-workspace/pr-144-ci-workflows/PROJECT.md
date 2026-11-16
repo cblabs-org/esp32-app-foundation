@@ -33,7 +33,7 @@ charter:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
   charter_hash: 840481209534f8091141c695fd57a8399150e2fd0f2f4541ae9ca29aa945516d
-status: AUDIT_APPROVED
+status: GRADUATED
 approved_at: '2026-11-15T23:45:43.180039Z'
 github_pr: null
 work_orders:
@@ -124,11 +124,12 @@ work_orders:
 
 - **Completed Date:** 2026-11-15
 - **Graduation Mode:** `builtin`
-- **Latest Audit:** Round 3 — `APPROVED` (`2069bb042b0d`)
+- **Latest Audit:** Round 4 — `APPROVED` (`38de56c6b1db`)
 
 | WO-ID | Status | Attempts | Commit SHA |
 |---|---|---|---|
 | WO-144.1 | COMPLETED | 1 | `071ad4023483` |
 | WO-144.2 | COMPLETED | 1 | `b14003376351` |
 | WO-144.3 | COMPLETED | 1 | `9a7ecd6e5b41` |
+| WO-144.4 | COMPLETED | 1 | `2bc1cf510284` |
 <!-- pa:graduation-summary end -->

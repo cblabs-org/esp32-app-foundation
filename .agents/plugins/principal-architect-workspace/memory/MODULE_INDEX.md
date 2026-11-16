@@ -384,3 +384,15 @@
 | Project | Scope | Context |
 |---|---|---|
 | [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## test/stubs/platform/mqtt_client.h
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## test/test_native/test_homeassistant/test_main.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
