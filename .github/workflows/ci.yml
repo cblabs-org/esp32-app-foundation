@@ -1,0 +1,215 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-secrets:
+    name: Lint & Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install gitleaks (v8.24.2)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_linux_x64.tar.gz" -o "$RUNNER_TEMP/gitleaks_8.24.2_linux_x64.tar.gz"
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_checksums.txt" -o "$RUNNER_TEMP/gitleaks_8.24.2_checksums.txt"
+          (cd "$RUNNER_TEMP" && grep "gitleaks_8.24.2_linux_x64.tar.gz" gitleaks_8.24.2_checksums.txt | sha256sum -c -)
+          tar -xzf "$RUNNER_TEMP/gitleaks_8.24.2_linux_x64.tar.gz" -C "$RUNNER_TEMP/bin" gitleaks
+          chmod +x "$RUNNER_TEMP/bin/gitleaks"
+          rm -f "$RUNNER_TEMP/gitleaks_8.24.2_linux_x64.tar.gz" "$RUNNER_TEMP/gitleaks_8.24.2_checksums.txt"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Scan git history for secrets
+        run: gitleaks detect --config .gitleaks.toml --log-opts="--all" --redact --verbose
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python test dependencies
+        run: pip install pytest
+
+      - name: Run documentation lint
+        run: python3 scripts/doc_lint.py
+
+      - name: Run Python script unit tests
+        run: pytest scripts/tests/
+
+  web-tests:
+    name: Web Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: test/web/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install web test dependencies and Chromium
+        working-directory: test/web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run web tests
+        env:
+          CI: "true"
+        run: python3 scripts/run_web_tests.py
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            test/web/playwright-report/
+            test/web/test-results/
+          if-no-files-found: ignore
+
+  native-tests:
+    name: Native Tests & Doc C++ Samples
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-native-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-native-
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Run native unit tests
+        run: pio test -e native
+
+      - name: Run native Home Assistant unit tests
+        run: pio test -e native_ha
+
+      - name: Compile-check documentation C++ samples
+        run: python3 scripts/check_doc_cpp_samples.py
+
+  firmware-build:
+    name: Firmware Build (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: root-esp32
+            dir: .
+            envs: esp32dev esp32dev_ha
+            pathb_smoke: false
+          - name: root-s3nano
+            dir: .
+            envs: esp32s3nano esp32s3nano_ble
+            pathb_smoke: false
+          - name: root-crowpanel
+            dir: .
+            envs: crowpanel-128-rotary
+            pathb_smoke: false
+          - name: sample-app-esp32
+            dir: sample-app
+            envs: esp32dev esp32dev_all_on esp32dev_all_off
+            pathb_smoke: false
+          - name: sample-app-s3nano
+            dir: sample-app
+            envs: esp32s3nano esp32s3nano_ble
+            pathb_smoke: false
+          - name: template-app
+            dir: template-app
+            envs: esp32dev esp32dev_all_on esp32dev_all_off esp32s3nano
+            pathb_smoke: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache PlatformIO platform and packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-fw-${{ matrix.name }}-${{ hashFiles('platformio.ini', 'sample-app/platformio.ini', 'template-app/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-fw-${{ matrix.name }}-
+            ${{ runner.os }}-pio-fw-
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build firmware environments
+        env:
+          SKIP_WEB_TESTS: "1"
+        run: |
+          set -euo pipefail
+          for env in ${{ matrix.envs }}; do
+            pio run -d "${{ matrix.dir }}" -e "$env"
+          done
+
+      - name: Path B standalone submodule consumer smoke build
+        if: matrix.pathb_smoke
+        env:
+          SKIP_WEB_TESTS: "1"
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/pathb-smoke
+          mkdir -p /tmp/pathb-smoke
+          cd /tmp/pathb-smoke
+          git init
+          git config user.email "ci@example.com"
+          git config user.name "CI"
+          git -c protocol.file.allow=always submodule add "$GITHUB_WORKSPACE" framework
+          cp -r framework/template-app/. .
+          rm -rf .pio managed_components sdkconfig sdkconfig.esp32* dependencies.lock
+          sed -i '/BOARD_HEADER/!s#\.\./#framework/#g' platformio.ini
+          git add -A
+          git commit -m "Path B smoke test"
+          pio run -d /tmp/pathb-smoke -e esp32dev

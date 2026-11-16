@@ -33,9 +33,9 @@ work_orders:
   title: Add GitHub Actions CI workflows, pin pioarduino platform, and harden run_web_tests.py
     (#144)
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: a9e83ababe397d48a68c12ef0ec7ed77b181c4e2
 ---
 
 # PR-144 — ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144)
