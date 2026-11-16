@@ -35,6 +35,30 @@ prs:
   required_skills: []
   status: GRADUATED
   github_pr: null
+- id: PR-327
+  slug: pr-327-release-audit
+  title: 'chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano
+    alignment'
+  branch: launch/pr-b-release-audit
+  base_branch: launch/pr-e-ci-workflows
+  depends_on: []
+  allowed_modules:
+  - lib/DeviceCrypto/DeviceCrypto.cpp
+  - lib/OTACerts/OTACerts.h
+  - modules/OTAUpdateManager/OTAUpdateManager.cpp
+  - modules/OTAUpdateManager/web/ota.js
+  - docs/developer/ota-update-system.md
+  - docs/codemender_findings.json
+  - docs/release-audits/
+  - CHANGELOG.md
+  - sample-app/platformio.ini
+  - template-app/platformio.ini
+  - test/stubs/platform/mbedtls/aes.h
+  - test/stubs/platform/mbedtls/base64.h
+  - test/test_unit/test_deviceCrypto/test_deviceCrypto.cpp
+  required_skills: []
+  status: PLANNED
+  github_pr: null
 ---
 
 # Public Launch v1.0.0-beta.1
@@ -69,4 +93,4 @@ Single-PR programme targeting `launch/pr-e-ci-workflows` (based on `launch/pr-d-
 ## 3. Programme Session Log
 
 - **2026-11-15 (Tier 1 Chief Architect):** Programme `prog-public-launch` initialized on base branch `launch/pr-d-readme-community`. Authored and locked Part I PR Charter for `PR-144` (`pr-144-ci-workflows`, branch `launch/pr-e-ci-workflows`) resolving issue #144. Dispatched to Tier 2 Principal Architect.
-- **2026-11-16 (Tier 1 Chief Architect):** `PR-144` successfully executed Work Orders `WO-144.1`, `WO-144.2`, `WO-144.3`, and `WO-144.4` (native portal asset stubs, `lvgl@9.5.0` & `LovyanGFX@1.2.26` pins, `CMD_ROTATE` guard, and `native_ha` MQTT C++17 ODR symbol deduplication), passed Step 6A Cold-Firewall Audit Round 4 (`849d7457`, `APPROVED`), and graduated via `66503aef`. Programme `prog-public-launch` is completed (`status: COMPLETED`).
+- **2026-11-16 (Tier 1 Chief Architect):** `PR-144` successfully executed Work Orders `WO-144.1` through `WO-144.5` (native portal asset stubs, `lvgl@9.5.0` & `LovyanGFX@1.2.26` pins, `CMD_ROTATE` guard, `native_ha` MQTT C++17 ODR symbol deduplication, and `check_doc_cpp_samples.py` Linux case fix + PCH precompilation), passed Step 6A Cold-Firewall Audit Round 5 (`3bfa212f`, `APPROVED`), and graduated via `512c94f5`. Programme `prog-public-launch` is completed (`status: COMPLETED`).
