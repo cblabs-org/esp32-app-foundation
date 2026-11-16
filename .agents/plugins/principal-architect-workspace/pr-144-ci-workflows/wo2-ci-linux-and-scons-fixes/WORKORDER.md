@@ -11,6 +11,7 @@ allowed_files:
 - modules/LVGLDisplay/LVGLDisplay.hpp
 - modules/EventBus/EventBus.hpp
 - modules/EventBus/EventBus.cpp
+- test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp
 forbidden_files:
 - docs/design_specification.md
 - modules/U8G2Display/
@@ -19,7 +20,7 @@ required_skills: []
 verification_command: pytest scripts/tests/ && python3 scripts/doc_lint.py
 max_attempts: 5
 max_structural_failures: 2
-spec_hash: 0f8a78fd4174587b8ecefeff2907d1600a27c8abe6f4985d330b2de90f52fc31
+spec_hash: 6c705a33936e62a03eeb8db38e10899e66e8fbd7b57c24a4ec20719cc72008a2
 completion: null
 ---
 
@@ -27,13 +28,14 @@ completion: null
 
 ## 1. Objective & Scope
 
-Resolve the 4 distinct Linux CI failures surfaced in live GitHub Actions run `43824194345` on branch `launch/pr-e-ci-workflows`:
+Resolve the 4 distinct Linux CI failures surfaced in live GitHub Actions run `43824194345` on branch `launch/pr-e-ci-workflows`, plus the `LVGLEventBusIntegrationTest` destruction-order bug uncovered by `_unitMutex`:
 1. Playwright `1.60.0` rejecting `ubuntu-latest` (`ubuntu26.04-x64`) in CI jobs.
 2. PlatformIO `6.2.0` overwriting `pioarduino`'s `tool-scons@4.40801.0` with `platformio/tool-scons@~4.41101.0` (missing `SCons.Tool.FortranCommon`) and cached broken SCons state.
 3. Missing `<mutex>` and `<vector>` headers in `modules/LVGLDisplay/LVGLDisplay.hpp` breaking Linux GCC `libstdc++` builds (`test_lvgl_stubs`, `test_lvglDisplay`, and `crowpanel-128-rotary`).
 4. Data race / vector reallocation crash (`SIGABRT` on Linux `glibc` in `EventBusTest.CrossTaskSubscribeUnsubscribeConcurrency`) in `#ifdef UNIT_TEST` `EventBus` code.
+5. Pre-existing C++ member destruction-order use-after-destroy bug in `test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp` (`LVGLEventBusIntegrationTest`), where `~LVGLDisplayModule()` unsubscribes from `_eventBus` after `~EventBus()` has already destroyed `eventBus` (and its `_unitMutex`).
 
-Scope is strictly bounded to `.github/workflows/`, `modules/LVGLDisplay/LVGLDisplay.hpp`, `modules/EventBus/EventBus.hpp`, and `modules/EventBus/EventBus.cpp`.
+Scope is strictly bounded to `.github/workflows/`, `modules/LVGLDisplay/LVGLDisplay.hpp`, `modules/EventBus/EventBus.hpp`, `modules/EventBus/EventBus.cpp`, and `test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp`.
 
 ## 2. Detailed Specification
 
@@ -98,12 +100,26 @@ Restrict all changes in both files to `#ifdef UNIT_TEST` code paths (do not alte
      ```
      This guarantees that if `cb(...)` calls `subscribe()` re-entrantly on the same thread and triggers `_subscribers.push_back(...)` reallocation, `_subscribers[i]` is no longer referenced across or after the invocation, while concurrent cross-thread `publish()` / `subscribe()` / `unsubscribe()` calls remain safely serialized (fixing `EventBusTest.CrossTaskSubscribeUnsubscribeConcurrency` `SIGABRT` on Linux `glibc`).
 
+### 2.4 `test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp` — Lifetime Declaration Order
+
+- In `LVGLEventBusIntegrationTest` (lines 20–25), `eventBus` is currently declared *after* `LVGLDisplayModule module{adapter};`, so C++ reverse-declaration member destruction destroys `eventBus` (including `_unitMutex`) before `~LVGLDisplayModule()` calls `_eventBus->unsubscribe(...)`.
+- Declare `EventBus eventBus;` **before** `MockLVGLHardwareAdapter adapter;` / `LVGLDisplayModule module{adapter};` (matching `test/test_unit/test_u8g2Display/test_eventbus_integration.cpp:111-112`), with a concise inline comment explaining why `eventBus` must outlive `module`:
+  ```cpp
+  class LVGLEventBusIntegrationTest : public ::testing::Test {
+  protected:
+      // Declared before module so eventBus outlives ~LVGLDisplayModule() unsubscribe calls.
+      EventBus eventBus;
+      MockLVGLHardwareAdapter adapter;
+      LVGLDisplayModule module{adapter};
+  ```
+- Preserves `adapter` -> `module{adapter}` construction order while ensuring `module` is destroyed before `eventBus`.
+
 ## 3. Verification Requirements
 
 1. **Mandatory Gate Command:**
    - `pytest scripts/tests/ && python3 scripts/doc_lint.py` (must exit `0` with zero failures).
 2. **Additional Relevant Checks (run via PlatformIO MCP / workspace tools per `.agents/rules/04-mcp-tooling.md`):**
-   - Run PlatformIO MCP `run_tests` on `native` (and `native_ha` if configured) to confirm `EventBus` and `LVGLDisplay` unit tests pass after edits.
+   - Run PlatformIO MCP `run_tests` on `native` (and `native_ha` if configured) to confirm `EventBus` tests (`EventBusTest.*`) and `LVGLDisplay` tests (`LVGLEventBusIntegrationTest.*` in `test_lvglDisplay`) compile and pass with zero use-after-destroy crashes after edits.
    - Verify `.github/workflows/ci.yml` passes YAML parsing and has zero remaining `ubuntu-latest`, unpinned `pip install platformio`, or unversioned `-pio-native-` / `-pio-fw-` cache keys.
 3. **`pa wo verify` Escalation Note (`PA_WO_VERIFY_DOTFILE_BUG`):**
    - **Skip `pa wo verify`** because `.github/workflows/ci.yml` triggers the known dotfile path bug (`PA_WO_VERIFY_DOTFILE_BUG`) in `pa wo verify`.
