@@ -19,11 +19,14 @@ charter:
   - scripts/run_web_tests.py
   - scripts/tests/
   - test/web/playwright.config.ts
+  - modules/LVGLDisplay/LVGLDisplay.hpp
+  - modules/EventBus/EventBus.hpp
+  - modules/EventBus/EventBus.cpp
   required_skills: []
   verification_floor:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
-  charter_hash: 038cb30232b08217e3f4ac10e61d5d790820d8fc7c8c45716a15c59d69a87447
+  charter_hash: b42795ec743d88602806ee7e88f7c42d3ffdd09818499d78a65f10a22e8ffbf9
 status: GRADUATED
 approved_at: '2026-11-15T23:45:43.180039Z'
 github_pr: null
