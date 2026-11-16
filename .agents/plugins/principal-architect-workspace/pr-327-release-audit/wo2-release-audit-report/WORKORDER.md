@@ -22,10 +22,9 @@ spec_hash: e76df8180bd90430938d347e517d4269230edbcddacb910ad5ed9d08cd209791
 completion:
   status: COMPLETED
   attempt_num: 1
-  receipt_id: rcpt_45d883088126
-  commit_sha: 5e92b000f52addf93fbaac2aab49b4356dc39808
+  receipt_id: rcpt_e9861627f996
+  commit_sha: 3a4ba4b9c6d4b5151957af20f502ce70febc131b
   files_modified:
-  - CHANGELOG.md
   - docs/release-audits/v1.0.0-beta.1.md
   verification_summary: 'pytest scripts/tests/ && python3 scripts/doc_lint.py && python3
     scripts/check_doc_cpp_samples.py: ======================================================================'

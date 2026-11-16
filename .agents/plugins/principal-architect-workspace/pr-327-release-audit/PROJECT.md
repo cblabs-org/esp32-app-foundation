@@ -46,7 +46,7 @@ work_orders:
   complexity: standard
   status: COMPLETED
   attempts: 1
-  commit_sha: 5e92b000f52addf93fbaac2aab49b4356dc39808
+  commit_sha: 3a4ba4b9c6d4b5151957af20f502ce70febc131b
 ---
 
 # PR-327 — chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment
