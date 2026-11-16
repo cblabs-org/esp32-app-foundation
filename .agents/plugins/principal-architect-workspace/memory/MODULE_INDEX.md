@@ -342,3 +342,39 @@
 | Project | Scope | Context |
 |---|---|---|
 | [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## modules/LVGLDisplay/LVGLDisplay.hpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## modules/EventBus/EventBus.hpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## modules/EventBus/EventBus.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## test/stubs/platform/Arduino.h
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## test/test_unit/test_homeassistant/test_homeassistant.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
