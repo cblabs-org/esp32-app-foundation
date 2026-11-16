@@ -30,7 +30,7 @@ charter:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
   charter_hash: fe3a01b7d56d7610e788362b6518dcdf6af1bd6d13ee53d77ce4443545aef411
-status: APPROVED
+status: AUDIT_APPROVED
 approved_at: '2026-11-15T23:45:43.180039Z'
 github_pr: null
 work_orders:
