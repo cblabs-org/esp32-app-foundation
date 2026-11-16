@@ -59,6 +59,21 @@ prs:
   required_skills: []
   status: GRADUATED
   github_pr: null
+- id: PR-328
+  slug: pr-328-release-pipeline
+  title: 'fix(release): infer split-repo slug from releases_dir and prune sub-floor
+    manifest channels'
+  branch: fix/release-pipeline-cblabs
+  base_branch: main
+  depends_on: []
+  allowed_modules:
+  - scripts/deploy_release.py
+  - scripts/test_ota_pagination.py
+  - scripts/tests/test_deploy_release.py
+  - releases/README.md
+  required_skills: []
+  status: GRADUATED
+  github_pr: null
 ---
 
 # Public Launch v1.0.0-beta.1
@@ -89,8 +104,11 @@ Single-PR programme targeting `launch/pr-e-ci-workflows` (based on `launch/pr-d-
 | PR | Project Charter | Branch | Base | Scope & Interface Contracts |
 |---|---|---|---|---|
 | `PR-144` | [`PROJECT.md`](../pr-144-ci-workflows/PROJECT.md) | `launch/pr-e-ci-workflows` | `launch/pr-d-readme-community` | GitHub Actions CI (`.github/workflows/ci.yml`), fail-closed `scripts/run_web_tests.py`, `scripts/tests/test_run_web_tests.py`, Playwright list reporter config (`test/web/playwright.config.ts`), `platformio.ini` platform pinning to `55.03.311`, `.gitleaks.toml` synchronization, and `README.md` CI badge. Resolves #144. |
+| `PR-327` | [`PROJECT.md`](../pr-327-release-audit/PROJECT.md) | `launch/pr-b-release-audit` | `launch/pr-e-ci-workflows` | `v1.0.0-beta.1` release audit (`CONDITIONAL PASS`), CWE-354 `DeviceCrypto` fail-closed PKCS#7 padding fix, OTA terminology alignment, 3-target `esp32s3nano` alignment, and `CHANGELOG.md`. |
+| `PR-328` | [`PROJECT.md`](../pr-328-release-pipeline/PROJECT.md) | `fix/release-pipeline-cblabs` | `main` | Split-repo slug inference from `releases_dir` in `scripts/deploy_release.py`, sub-floor channel pruning + org URL normalization in `apply_risk_floor()`, `scripts/test_ota_pagination.py` default repo fix, `scripts/tests/test_deploy_release.py`, and `./releases` README update. |
 
 ## 3. Programme Session Log
 
 - **2026-11-15 (Tier 1 Chief Architect):** Programme `prog-public-launch` initialized on base branch `launch/pr-d-readme-community`. Authored and locked Part I PR Charter for `PR-144` (`pr-144-ci-workflows`, branch `launch/pr-e-ci-workflows`) resolving issue #144. Dispatched to Tier 2 Principal Architect.
 - **2026-11-16 (Tier 1 Chief Architect):** `PR-144` successfully executed Work Orders `WO-144.1` through `WO-144.5` (native portal asset stubs, `lvgl@9.5.0` & `LovyanGFX@1.2.26` pins, `CMD_ROTATE` guard, `native_ha` MQTT C++17 ODR symbol deduplication, and `check_doc_cpp_samples.py` Linux case fix + PCH precompilation), passed Step 6A Cold-Firewall Audit Round 5 (`3bfa212f`, `APPROVED`), and graduated via `512c94f5`. Programme `prog-public-launch` is completed (`status: COMPLETED`).
+- **2026-11-16 (Tier 1 Chief Architect):** All 5 public launch PRs (`#323`–`#327`) merged to `main`. Chartered `PR-328` (`pr-328-release-pipeline`, branch `fix/release-pipeline-cblabs`) after auditing `cblabs-org/esp32-app-foundation-releases` `manifest.json` and `./releases` remotes.

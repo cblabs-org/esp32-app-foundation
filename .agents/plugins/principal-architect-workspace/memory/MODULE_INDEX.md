@@ -470,3 +470,27 @@
 | Project | Scope | Context |
 |---|---|---|
 | [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
+
+## scripts/deploy_release.py
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-328-release-pipeline](../pr-328-release-pipeline/PROJECT.md) | fix(release): infer split-repo slug from releases_dir and prune sub-floor manifest channels | [PROJECT.md](../pr-328-release-pipeline/PROJECT.md) |
+
+## scripts/test_ota_pagination.py
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-328-release-pipeline](../pr-328-release-pipeline/PROJECT.md) | fix(release): infer split-repo slug from releases_dir and prune sub-floor manifest channels | [PROJECT.md](../pr-328-release-pipeline/PROJECT.md) |
+
+## scripts/tests/test_deploy_release.py
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-328-release-pipeline](../pr-328-release-pipeline/PROJECT.md) | fix(release): infer split-repo slug from releases_dir and prune sub-floor manifest channels | [PROJECT.md](../pr-328-release-pipeline/PROJECT.md) |
+
+## releases/README.md
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-328-release-pipeline](../pr-328-release-pipeline/PROJECT.md) | fix(release): infer split-repo slug from releases_dir and prune sub-floor manifest channels | [PROJECT.md](../pr-328-release-pipeline/PROJECT.md) |

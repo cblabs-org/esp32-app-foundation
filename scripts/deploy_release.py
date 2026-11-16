@@ -54,6 +54,7 @@ import re
 import shutil
 import subprocess
 import sys
+from urllib.parse import urlparse
 
 
 # Board list matching the CI matrix
@@ -170,20 +171,107 @@ def parse_channel(tag: str) -> str:
     return m.group(1) or "stable"
 
 
-def get_repo_slug(target_repo: str = None) -> str:
-    """Return the repo slug (owner/repo) — from --repo or git remote."""
-    if target_repo:
-        return target_repo
+_GITHUB_SLUG_PART_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+_GITHUB_SCP_RE = re.compile(r"^[^/@\s]+@github\.com:([^/\s].*)$", re.IGNORECASE)
+_GITHUB_RELEASE_URL_PREFIX_RE = re.compile(
+    r"^https://github\.com/[^/]+/[^/]+/releases/download/"
+)
+
+
+def parse_github_slug(remote_url: str) -> str | None:
+    """Parse an ``owner/repo`` slug from a GitHub HTTPS or SSH remote URL.
+
+    Supports ``https://`` (and ``http://``), SCP-style ``git@github.com:owner/repo``,
+    and ``ssh://git@github.com/owner/repo`` URLs, with optional ``.git`` suffix
+    and optional trailing slash. Returns ``None`` for empty strings, non-GitHub
+    hosts, local paths, or malformed repository paths.
+    """
+    if not isinstance(remote_url, str):
+        return None
+    url = remote_url.strip()
+    if not url:
+        return None
+
+    path = None
+    if "://" in url:
+        parsed = urlparse(url)
+        if parsed.scheme.lower() not in ("https", "http", "ssh"):
+            return None
+        if (parsed.hostname or "").lower() != "github.com":
+            return None
+        if parsed.query or parsed.fragment:
+            return None
+        path = parsed.path.lstrip("/")
+    else:
+        scp_match = _GITHUB_SCP_RE.match(url)
+        if not scp_match:
+            return None
+        path = scp_match.group(1)
+
+    path = path.rstrip("/")
+    parts = path.split("/")
+    if len(parts) != 2:
+        return None
+
+    owner, repo = parts
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+
+    if not owner or not repo or owner in (".", "..") or repo in (".", ".."):
+        return None
+    if not (_GITHUB_SLUG_PART_RE.fullmatch(owner) and _GITHUB_SLUG_PART_RE.fullmatch(repo)):
+        return None
+
+    return f"{owner}/{repo}"
+
+
+def _infer_slug_from_git(cwd: str | None) -> str | None:
+    """Infer a GitHub ``owner/repo`` slug from git origin or ``gh repo view``."""
+    git_cmd = (
+        ["git", "-C", cwd, "remote", "get-url", "origin"]
+        if cwd
+        else ["git", "remote", "get-url", "origin"]
+    )
     try:
-        result = subprocess.run(
-            ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-            capture_output=True, text=True, check=True, timeout=10,
+        git_res = subprocess.run(
+            git_cmd, capture_output=True, text=True, check=True, timeout=10,
         )
-        return result.stdout.strip()
+        slug = parse_github_slug(git_res.stdout.strip())
+        if slug:
+            return slug
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
-        print("WARNING: Could not determine repo slug — manifest URLs may be incorrect",
-              file=sys.stderr)
-        return "UNKNOWN/REPO"
+        pass
+
+    try:
+        gh_res = subprocess.run(
+            ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
+            cwd=cwd, capture_output=True, text=True, check=True, timeout=10,
+        )
+        slug = gh_res.stdout.strip()
+        if slug:
+            return slug
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    return None
+
+
+def get_repo_slug(target_repo: str = None, releases_dir: str = None) -> str:
+    """Return the repo slug (owner/repo) from --repo, releases_dir, or CWD git remote."""
+    if target_repo and target_repo.strip():
+        return target_repo.strip()
+
+    if releases_dir and os.path.exists(os.path.join(releases_dir, ".git")):
+        slug = _infer_slug_from_git(releases_dir)
+    else:
+        slug = _infer_slug_from_git(None)
+
+    if slug:
+        return slug
+
+    print("WARNING: Could not determine repo slug — manifest URLs may be incorrect",
+          file=sys.stderr)
+    return "UNKNOWN/REPO"
 
 
 # ---------------------------------------------------------------------------
@@ -457,21 +545,23 @@ def create_release(tag: str, dry_run: bool, target_repo: str = None) -> None:
     run(upload_cmd, dry_run=dry_run)
 
 
-def apply_risk_floor(manifest: dict, new_version_str: str) -> dict:
-    """Apply risk-floor scanning across all channels in the manifest.
+def apply_risk_floor(manifest: dict, new_version_str: str, repo_slug: str = None) -> dict:
+    """Apply risk-floor pruning, promotion, and asset URL normalization.
 
-    For each channel, ensure its version is the best available for that
-    stability floor. A stable release is valid for ALL channels. A dev
-    release is only valid for the dev channel.
+    Pass 1 (Prune): Remove channel entries whose version is invalid or below
+    the channel's stability floor (e.g. a dev tag sitting in ``stable``).
 
-    Example: deploying v1.0.0 (stable) — if dev channel has v0.0.9-dev.5,
-    update dev to v1.0.0 because stable >= dev floor and v1.0.0 > v0.0.9-dev.5.
+    Pass 2 (Promote): Upgrade surviving channels whose floor is met by
+    ``new_version_str`` whenever ``new_ver > existing_ver``, cloning asset
+    dicts so channels remain independent.
 
-    The new version's assets are copied to any channel that gets upgraded.
+    Pass 3 (Normalize URLs): When ``repo_slug`` is known, rewrite any GitHub
+    release download URL prefix on surviving assets to ``repo_slug``.
 
     Args:
         manifest: The full manifest dict (with all channel entries).
         new_version_str: The version being deployed (e.g. "v1.0.0").
+        repo_slug: Target repo slug (owner/repo) for normalizing asset URLs.
 
     Returns:
         Updated manifest dict with risk-floor adjustments applied.
@@ -485,31 +575,72 @@ def apply_risk_floor(manifest: dict, new_version_str: str) -> dict:
 
     new_stability = new_ver.channel  # 0=dev, 1=beta, 2=rc, 3=stable
     channels = manifest.get("channels", {})
+    if not isinstance(channels, dict):
+        channels = {}
 
-    # Find the channel entry for the new version (to copy its assets)
+    # Pass 1: Prune invalid or sub-floor channel entries
+    for ch_name in list(channels.keys()):
+        ch_entry = channels[ch_name]
+        ch_floor = channel_stability_floor(ch_name)
+        if not isinstance(ch_entry, dict):
+            print(f"  Pruning invalid channel '{ch_name}': entry is not an object")
+            del channels[ch_name]
+            continue
+
+        raw_ver = ch_entry.get("version", "")
+        try:
+            existing_ver = FirmwareVersion(raw_ver if isinstance(raw_ver, str) else "")
+        except ValueError:
+            print(f"  Pruning invalid channel '{ch_name}': invalid version {raw_ver!r}")
+            del channels[ch_name]
+            continue
+
+        if existing_ver.channel < ch_floor:
+            print(
+                f"  Pruning invalid channel '{ch_name}': version '{raw_ver}' "
+                f"does not meet '{ch_name}' stability floor"
+            )
+            del channels[ch_name]
+
+    # Pass 2: Risk-floor promotion across surviving channels
     new_channel_name = parse_channel(new_version_str)
     new_entry = channels.get(new_channel_name, {})
+    if not isinstance(new_entry, dict):
+        new_entry = {}
 
     for ch_name, ch_entry in channels.items():
         ch_floor = channel_stability_floor(ch_name)
-
-        # The new version is eligible for this channel if its stability >= the floor
         if new_stability < ch_floor:
             continue
 
-        try:
-            existing_ver = FirmwareVersion(ch_entry.get("version", "v0.0.0"))
-        except ValueError:
-            continue
-
+        existing_ver = FirmwareVersion(ch_entry["version"])
         if new_ver > existing_ver:
             print(f"  Risk-floor: upgrading '{ch_name}' from {existing_ver.raw} → {new_ver.raw}")
             ch_entry["version"] = new_ver.raw
-            # Copy assets from the new entry if available
             if "assets" in new_entry:
-                ch_entry["assets"] = new_entry["assets"]
+                ch_entry["assets"] = [
+                    dict(asset) if isinstance(asset, dict) else asset
+                    for asset in new_entry["assets"]
+                ]
             if "securityVersion" in new_entry:
                 ch_entry["securityVersion"] = new_entry["securityVersion"]
+
+    # Pass 3: Normalize GitHub release download URLs to target repo_slug
+    if repo_slug and repo_slug != "UNKNOWN/REPO":
+        target_prefix = f"https://github.com/{repo_slug}/releases/download/"
+        for ch_entry in channels.values():
+            assets = ch_entry.get("assets")
+            if not isinstance(assets, list):
+                continue
+            for asset in assets:
+                if not isinstance(asset, dict):
+                    continue
+                for url_key in ("firmwareUrl", "signatureUrl"):
+                    url_val = asset.get(url_key)
+                    if isinstance(url_val, str):
+                        asset[url_key] = _GITHUB_RELEASE_URL_PREFIX_RE.sub(
+                            target_prefix, url_val, count=1
+                        )
 
     manifest["channels"] = channels
     return manifest
@@ -532,7 +663,7 @@ def update_manifest(tag: str, repo_slug: str, private_key: str,
     Args:
         tag: Version tag being deployed (e.g. v3.1.0).
         repo_slug: Target repo slug (owner/repo) for URL construction.
-        private_key: Path to the ECDSA private key.
+        private_key: Path to the RSA-2048 private key.
         releases_dir: Local git checkout of the releases repo.
         dry_run: If True, print commands without executing.
     """
@@ -581,7 +712,7 @@ def update_manifest(tag: str, repo_slug: str, private_key: str,
 
     # 6d. Apply risk-floor scanning
     print("  Applying risk-floor scanning...")
-    manifest = apply_risk_floor(manifest, tag)
+    manifest = apply_risk_floor(manifest, tag, repo_slug=repo_slug)
     print("  Risk-floor scan complete")
 
     # 6e. Set manifestUrl
@@ -638,7 +769,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--tag", help="Git tag for the release (e.g. v3.1.0). "
                                       "If omitted, auto-detected from the tag on HEAD.")
-    parser.add_argument("--private-key", required=True, help="Path to ECDSA private key")
+    parser.add_argument("--private-key", required=True, help="Path to RSA-2048 private key")
 
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument(
@@ -730,7 +861,8 @@ def main() -> None:
     args.tag = resolve_tag(args.tag)
 
     mode = "local" if args.local else f"CI (run {args.run_id})"
-    repo_slug = get_repo_slug(args.repo)
+    releases_dir = None if args.sign_only else resolve_releases_dir(args.releases_dir)
+    repo_slug = get_repo_slug(args.repo, releases_dir=releases_dir)
     print(f"=== Deploy Release: {args.tag} ===")
     print(f"  Mode:        {mode}")
     print(f"  Private key: {args.private_key}")
@@ -756,10 +888,10 @@ def main() -> None:
     if args.sign_only:
         print(f"\n✅ Signed binaries + hashes ready in {ARTIFACTS_DIR}/")
     else:
-        create_release(args.tag, args.dry_run, target_repo=args.repo)
+        target_repo = repo_slug if repo_slug != "UNKNOWN/REPO" else args.repo
+        create_release(args.tag, args.dry_run, target_repo=target_repo)
 
         # Update git-managed manifest
-        releases_dir = resolve_releases_dir(args.releases_dir)
         update_manifest(
             tag=args.tag,
             repo_slug=repo_slug,
