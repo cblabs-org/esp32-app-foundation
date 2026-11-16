@@ -318,12 +318,14 @@
 | Project | Scope | Context |
 |---|---|---|
 | [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
 
 ## template-app/platformio.ini
 
 | Project | Scope | Context |
 |---|---|---|
 | [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
 
 ## scripts/run_web_tests.py
 
@@ -402,3 +404,69 @@
 | Project | Scope | Context |
 |---|---|---|
 | [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## lib/DeviceCrypto/DeviceCrypto.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
+
+## lib/OTACerts/OTACerts.h
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
+
+## modules/OTAUpdateManager/OTAUpdateManager.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
+
+## modules/OTAUpdateManager/web/ota.js
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
+
+## docs/developer/ota-update-system.md
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
+
+## docs/codemender_findings.json
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
+
+## docs/release-audits/
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
+
+## CHANGELOG.md
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
+
+## test/stubs/platform/mbedtls/aes.h
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
+
+## test/stubs/platform/mbedtls/base64.h
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |
+
+## test/test_unit/test_deviceCrypto/test_deviceCrypto.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment | [PROJECT.md](../pr-327-release-audit/PROJECT.md) |

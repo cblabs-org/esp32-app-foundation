@@ -115,7 +115,7 @@ executes the following pipeline:
 2. **Fetch manifest** — download `manifest.json` from the learned URL (or
    fall back to the compiled-in URL; see [§4.1.2](#412-manifest-url-resilience))
 3. **Verify manifest signature** (Gate 1) — download `manifest.json.sig`,
-   verify the detached ECDSA signature. If verification fails on the learned
+   verify the detached RSA-2048 signature. If verification fails on the learned
    URL, fall back to the compiled-in URL. If both fail, abort (fail-closed).
 4. **Parse manifest** — extract the channel entry for the device's configured
    channel. Select the asset matching `BOARD_ID`.

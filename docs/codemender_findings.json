@@ -3,14 +3,14 @@
     "finding_id": "16fcfbbe-e122-5060-9a72-8c32dce3d505",
     "session_id": "ChBmMTRjNWFkMWVlMmFkNDNlEAgaATAqBG1haW4",
     "title": "Improper PKCS#7 Padding Validation in DeviceCrypto::removePKCS7Padding Causes Silent Decryption Corruption",
-    "file_path": "/home/mattmcneill/esp32-app-foundation/lib/DeviceCrypto/DeviceCrypto.cpp",
+    "file_path": "lib/DeviceCrypto/DeviceCrypto.cpp",
     "severity": "HIGH",
     "confidence": 100,
     "analysis": "In `DeviceCrypto::removePKCS7Padding()`, the PKCS#7 padding validation loop checks whether all `paddingValue` trailing bytes equal `paddingValue`. When an invalid padding byte is encountered (`buffer[paddedLen - 1 - i] != paddingValue`), the function executes `return paddedLen;` instead of returning `0` to signal an error.\n\nData Path:\n- Source: Encrypted secrets loaded from storage (such as `/etc/keys.json` by `KeyManager::getKeyById()` or via restored configuration backups).\n- Validation: `DeviceCrypto::removePKCS7Padding()` validates PKCS#7 padding on decrypted blocks. However, on byte mismatch (line 88), it returns `paddedLen` rather than `0`.\n- Sink: `DeviceCrypto::decrypt()` checks `if (unpaddedLen \u003e 0 \u0026\u0026 unpaddedLen \u003c= ciphertextLen)`. Because `unpaddedLen == paddedLen == ciphertextLen`, it evaluates as valid, allocates memory, and returns corrupted plaintext containing the invalid padding bytes.\n\nConceptual Exploit Payload:\nA base64 ciphertext whose final decrypted block ends with a byte indicating padding length N (e.g., `0x05`), but where one of the preceding 4 bytes does not equal `0x05`. When passed to `DeviceCrypto::decrypt()`, `removePKCS7Padding()` triggers the mismatch branch and returns `paddedLen`, causing `decrypt()` to falsely report \"Decryption verified\" and return corrupted plaintext with trailing bytes intact rather than failing and returning `nullptr`.",
     "snippet": "size_t DeviceCrypto::removePKCS7Padding(const uint8_t* buffer, size_t paddedLen) {\n    if (paddedLen == 0 || paddedLen % 16 != 0) return 0;\n    uint8_t paddingValue = buffer[paddedLen - 1];\n    \n    if (paddingValue == 0 || paddingValue \u003e 16) return 0; // Invalid padding — signal error to caller\n    \n    for (size_t i = 0; i \u003c paddingValue; i++) {\n        if (buffer[paddedLen - 1 - i] != paddingValue) {\n            return paddedLen;\n        }\n    }\n    return paddedLen - paddingValue;\n}",
     "vuln_type": "Improper Validation of Integrity Check Value",
     "vuln_id": "CWE-354",
-    "status": "OPEN",
+    "status": "RESOLVED",
     "start_line": 80,
     "end_line": 92
   }
