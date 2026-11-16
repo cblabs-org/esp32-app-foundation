@@ -19,10 +19,18 @@ charter:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
   charter_hash: c739fe159bdd2cf4d3bb80e36d23a39eac4b7ade5cc216ed6b003545d3457b05
-status: PLANNED
-approved_at: null
+status: APPROVED
+approved_at: '2026-11-16T21:04:19.329526Z'
 github_pr: null
-work_orders: []
+work_orders:
+- id: WO-328.1
+  slug: wo1-release-pipeline-fixes
+  title: Fix split-repo slug inference, risk-floor pruning/URL normalization, pagination
+    default, and unit tests
+  complexity: standard
+  status: PENDING
+  attempts: 0
+  commit_sha: null
 ---
 
 # PR-328 — fix(release): infer split-repo slug from releases_dir and prune sub-floor manifest channels
@@ -59,5 +67,18 @@ work_orders: []
 - Verification floor: `pytest scripts/tests/ && python3 scripts/doc_lint.py`.
 
 ## 3. Implementation Plan & Work Order Breakdown
+
+`PR-328` is executed as a single bounded Work Order on branch `fix/release-pipeline-cblabs` (base: `main`):
+
+| WO ID | Slug | Title | Complexity | Dependencies |
+| --- | --- | --- | --- | --- |
+| `WO-328.1` | `wo1-release-pipeline-fixes` | Fix split-repo slug inference, risk-floor pruning/URL normalization, pagination default, and unit tests | `standard` | Charter locked |
+
+### Sequencing & Architectural Notes
+1. **Release Pipeline Fixes, Pagination Default, Unit Tests, & Releases README — `WO-328.1`:**
+   - **`scripts/deploy_release.py`:** Implement `parse_github_slug(remote_url)`, update `get_repo_slug(target_repo=None, releases_dir=None)` to infer `owner/repo` from `<releases_dir>/.git` `origin` (or `gh repo view` in `releases_dir`) before falling back to CWD or `"UNKNOWN/REPO"`, resolve `releases_dir` before `repo_slug` in `main()` and pass `target_repo=(repo_slug if repo_slug != "UNKNOWN/REPO" else args.repo)` to `create_release()`, refactor `apply_risk_floor(manifest, new_version_str, repo_slug=None)` into 3 passes (prune sub-floor/invalid channels, promote eligible channels, normalize surviving GitHub release asset URL prefixes to `repo_slug`), pass `repo_slug=repo_slug` from `update_manifest()`, and update stale `"ECDSA"` private-key strings to `"RSA-2048"`.
+   - **`scripts/test_ota_pagination.py`:** Update default target repository to `cblabs-org/esp32-app-foundation-releases` and add `--repo` CLI option.
+   - **`scripts/tests/test_deploy_release.py`:** Add offline hermetic pytest suite covering `parse_github_slug`, `get_repo_slug` (explicit, split-repo remote, single-repo fallback, `gh` fallback, unknown), `apply_risk_floor` (pruning sub-floor `"stable": "v0.0.12-dev.9"` and normalizing valid `"stable": "v1.0.0"` asset URLs), `update_manifest(..., dry_run=True)`, and `main()` split-repo target propagation, using `legacy-owner` in test fixtures (never legacy maintainer username strings).
+   - **`releases/README.md`:** Update line 5 source link to `https://github.com/cblabs-org/esp32-app-foundation` (removing `(private)`), modifying the file on disk only since `./releases` is a gitignored nested clone committed on its own repository branch later.
 
 ## 4. Outcome & Session Log
