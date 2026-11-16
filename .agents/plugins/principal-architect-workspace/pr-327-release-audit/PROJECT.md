@@ -28,7 +28,7 @@ charter:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
   charter_hash: 623ba85903ba87ad4fc3639f6a08fefee3c6c4837a9e10489e6c71f5aa6db01a
-status: AUDIT_APPROVED
+status: GRADUATED
 approved_at: '2026-11-16T16:16:34.909021Z'
 github_pr: null
 work_orders:
@@ -109,3 +109,17 @@ work_orders:
 - `python3 scripts/doc_lint.py`: exit `0`
 - `python3 scripts/check_doc_cpp_samples.py`: `35` files, `49` contracts + `41` samples PASSED (`0` failed, `130` skipped)
 - `python3 scripts/next_version.py --channel beta --bump major` & `--target 1.0.0`: both output `v1.0.0-beta.1`
+
+<!-- pa:graduation-summary start -->
+### Graduation Summary (`PR-327` / `pr-327-release-audit` — `GRADUATED`)
+
+- **Completed Date:** 2026-11-16
+- **Graduation Mode:** `builtin`
+- **Latest Audit:** Round 2 — `APPROVED` (`7e7156f29e21`)
+
+| WO-ID | Status | Attempts | Commit SHA |
+|---|---|---|---|
+| WO-327.1 | COMPLETED | 1 | `a4e80e3692ec` |
+| WO-327.2 | COMPLETED | 1 | `3a4ba4b9c6d4` |
+| WO-327.3 | COMPLETED | 1 | `f9512cf2b438` |
+<!-- pa:graduation-summary end -->

@@ -57,7 +57,7 @@ prs:
   - test/stubs/platform/mbedtls/base64.h
   - test/test_unit/test_deviceCrypto/test_deviceCrypto.cpp
   required_skills: []
-  status: PLANNED
+  status: GRADUATED
   github_pr: null
 ---
 
