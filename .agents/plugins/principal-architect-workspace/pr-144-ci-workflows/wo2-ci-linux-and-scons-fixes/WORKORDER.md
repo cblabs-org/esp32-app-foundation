@@ -5,7 +5,7 @@ pr_id: PR-144
 title: Fix Linux CI runner, PlatformIO 6.1.19, LVGLDisplay headers, EventBus tests,
   and native_ha test_homeassistant
 complexity: standard
-status: PENDING
+status: COMPLETED
 allowed_files:
 - .github/workflows/
 - modules/LVGLDisplay/LVGLDisplay.hpp
@@ -23,7 +23,25 @@ verification_command: pytest scripts/tests/ && python3 scripts/doc_lint.py
 max_attempts: 5
 max_structural_failures: 2
 spec_hash: 142aa701727fbcbfb2296448411b866baea239bc5a1a4db0088e3479f4215d8a
-completion: null
+completion:
+  status: COMPLETED
+  attempt_num: 1
+  receipt_id: rcpt_56ea0978196e
+  commit_sha: b1400337635194d53d7ae56ce29cbeeae676bf75
+  files_modified:
+  - .github/workflows/ci.yml
+  - modules/EventBus/EventBus.cpp
+  - modules/EventBus/EventBus.hpp
+  - modules/LVGLDisplay/LVGLDisplay.hpp
+  - test/stubs/platform/Arduino.h
+  - test/test_unit/test_homeassistant/test_homeassistant.cpp
+  - test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp
+  verification_summary: 'pytest scripts/tests/ && python3 scripts/doc_lint.py: ==============================
+    93 passed in 0.34s =============================='
+  out_of_scope_findings: []
+  escalation_request: null
+  decisions_made: []
+  dead_ends: []
 ---
 
 # WO-144.2 — Fix Linux CI runner, PlatformIO 6.1.19, LVGLDisplay headers, EventBus tests, and native_ha test_homeassistant

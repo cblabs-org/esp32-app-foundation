@@ -118,7 +118,12 @@ inline void convertToJson(const String& src, T dst) {
 
 inline void delay(uint32_t ms) { (void)ms; }
 inline float temperatureRead() { return 42.0f; }
-inline unsigned long millis() { return 0; }
+inline unsigned long& _arduinoMockMillis() {
+    static unsigned long v = 0;
+    return v;
+}
+inline void setMockMillis(unsigned long ms) { _arduinoMockMillis() = ms; }
+inline unsigned long millis() { return _arduinoMockMillis(); }
 inline unsigned long micros() { return 0; }
 
 // GPIO stubs — no physical pins on native.

@@ -51,6 +51,8 @@
 #include <cstdint>
 #include <cstddef>
 #include <atomic>
+#include <mutex>
+#include <vector>
 #include <ArduinoJson.h>
 #include "interfaces/ITickable.hpp"
 #include "events/AppConfiguringPayload.hpp"
