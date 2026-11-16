@@ -37,9 +37,9 @@ work_orders:
   title: Remediate DeviceCrypto CWE-354 PKCS#7 padding, OTA comments, esp32s3nano
     alignment, and CHANGELOG
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: a4e80e3692ec462b10cb74ad360ebf9169601fc8
 - id: WO-327.2
   slug: wo2-release-audit-report
   title: Author v1.0.0-beta.1 10-dimension release audit report with bench soak telemetry

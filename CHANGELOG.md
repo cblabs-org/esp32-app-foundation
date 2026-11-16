@@ -59,6 +59,16 @@ section summarises what the framework provides as of this release.
 - **`MCPServer._mcpReadOnly` now defaults to `true`** (was `false`). Closes a defence-in-depth
   fail-open window where mutating MCP tools could theoretically be served before ConfigManager
   applied the secure default. (#214)
+- **`DeviceCrypto::removePKCS7Padding()` fail-closed PKCS#7 validation (CWE-354)**: returns `0`
+  (rejecting decryption with `nullptr`) on any padding byte mismatch instead of returning
+  `paddedLen`, backed by real RFC 4648 Base64 and 256-bit keyed CBC native unit tests.
+- **`[env:esp32s3nano]` board, upload, and USB-CDC alignment** across `sample-app/platformio.ini`
+  and `template-app/platformio.ini` (`board = arduino_nano_esp32`, `upload_protocol = esptool`,
+  `board_upload.arduino.flash_extra_images =` suppression, `-DARDUINO_USB_MODE=1`,
+  `-DARDUINO_USB_CDC_ON_BOOT=1`) matching root `platformio.ini`.
+- **OTA TLS and RSA-2048 terminology alignment** across `OTACerts.h`, `OTAUpdateManager.cpp`,
+  `ota.js`, and `docs/developer/ota-update-system.md` (removing stale `setInsecure()` comments
+  and updating legacy `ECDSA` labels to `RSA-2048`).
 
 #### Added
 - **`BLEManager` optional module (`WITH_BLE`, ESP32-S3)**: Managed Bluetooth Low Energy infrastructure
@@ -66,6 +76,12 @@ section summarises what the framework provides as of this release.
   static GATT topology, priority-based advertising budgeting, FreeRTOS worker queue isolation,
   web portal tab, MCP tools, and Wi-Fi/BLE coexistence hardening (RFC #225).
   Non-breaking: opt-in via the `[ble]` environment mix-in and `sdkconfig.ble.defaults` fragment.
+- **DHCP NTP and Timezone support in `TimeManager`** (`#320`/`#322`): RFC 2132 DHCP Option 42
+  NTP server discovery and RFC 4833 DHCP Options 100/101 (`PCode`/`TCode`) timezone acquisition.
+- **GitHub Actions CI quality gates & platform pinning** (`#144`/`#326`): automated `lint-and-secrets`
+  (`gitleaks` with `.gitleaks.toml`, `doc_lint.py`, `pytest`), `web-tests` (fail-closed
+  `run_web_tests.py` Playwright gate), `native-tests` (`native`, `native_ha`,
+  `check_doc_cpp_samples.py`), and `firmware-build` matrix pinned to `pioarduino` `55.03.311`.
 - `ISanitizer`, `IBootReporter`, `IDisplayModule` added to `AppFoundation.h` facade.
 - Interface placement ADR (`docs/developer/adr/adr-interface-placement.md`).
 - `std::function` exception policy documented in `docs/developer/coding-patterns.md`.

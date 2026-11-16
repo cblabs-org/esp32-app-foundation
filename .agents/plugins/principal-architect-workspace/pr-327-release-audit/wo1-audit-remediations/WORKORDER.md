@@ -5,7 +5,7 @@ pr_id: PR-327
 title: Remediate DeviceCrypto CWE-354 PKCS#7 padding, OTA comments, esp32s3nano alignment,
   and CHANGELOG
 complexity: standard
-status: PENDING
+status: COMPLETED
 allowed_files:
 - lib/DeviceCrypto/DeviceCrypto.cpp
 - lib/OTACerts/OTACerts.h
@@ -31,7 +31,32 @@ verification_command: pytest scripts/tests/ && python3 scripts/doc_lint.py && py
 max_attempts: 5
 max_structural_failures: 2
 spec_hash: f5fd679214da31460da42a016f9815a3f027650594ad0aba943bd0074df367e3
-completion: null
+completion:
+  status: COMPLETED
+  attempt_num: 1
+  receipt_id: rcpt_e47979d504be
+  commit_sha: a4e80e3692ec462b10cb74ad360ebf9169601fc8
+  files_modified:
+  - CHANGELOG.md
+  - docs/codemender_findings.json
+  - docs/developer/ota-update-system.md
+  - lib/DeviceCrypto/DeviceCrypto.cpp
+  - lib/OTACerts/OTACerts.h
+  - modules/OTAUpdateManager/OTAUpdateManager.cpp
+  - modules/OTAUpdateManager/web/ota.js
+  - sample-app/platformio.ini
+  - template-app/platformio.ini
+  - test/stubs/platform/mbedtls/aes.h
+  - test/stubs/platform/mbedtls/base64.h
+  - test/test_unit/test_deviceCrypto/test_deviceCrypto.cpp
+  verification_summary: pytest 93/93, doc_lint exit 0, doc C++ 49+41/0 fail, web 92/92,
+    native 1026/1026 (RealDeviceCryptoTest PASS), native_ha 1050/1050, sample-app
+    & template-app esp32s3nano SUCCESS, release-audit 22/25 (setInsecure=0), gitleaks
+    0 leaks.
+  out_of_scope_findings: []
+  escalation_request: null
+  decisions_made: []
+  dead_ends: []
 ---
 
 # WO-327.1 — Remediate DeviceCrypto CWE-354 PKCS#7 padding, OTA comments, esp32s3nano alignment, and CHANGELOG
@@ -165,4 +190,23 @@ Update the `## [1.0.0-beta.1]` section (`### Since the last internal build (`v0.
 ## Completion Report
 <!-- Written by the Tier 3 Worker at task completion -->
 
-_Pending execution._
+All 12 `allowed_files` for `WO-327.1` are implemented and verified, and all edits remain unstaged (`git diff --cached --name-only` empty; `pa wo verify` and `git add`/`git commit` not run) for Coordinator receipt stamping (`ESCALATED_TO_PA`, `COORDINATOR_RECEIPT_STAMPING`).
+
+### Implemented Changes (Observed via `git diff`)
+- **`lib/DeviceCrypto/DeviceCrypto.cpp` (`L1-L11`, `L87-L98`):** Aligned CB Labs header banner/casing and fixed `DeviceCrypto::removePKCS7Padding()` mismatch branch to `return 0;` (CWE-354 fail-closed padding check).
+- **`test/stubs/platform/mbedtls/{base64.h,aes.h}`:** Implemented RFC 4648 `mbedtls_base64_encode`/`mbedtls_base64_decode` (with `MBEDTLS_ERR_BASE64_*` codes and null-terminator semantics) and 16-round 256-bit keyed bijective CBC (`mbedtls_aes_*`) safe for in-place `input == output`.
+- **`test/test_unit/test_deviceCrypto/test_deviceCrypto.cpp`:** Preserved all `MockDeviceCrypto` / `DeviceCryptoTest` cases and added `RealDeviceCryptoTest` (`UninitializedGuardAndEmptyInput`, `RoundTripBoundaryLengthsAndFreshIV`, `RejectsInvalidPKCS7PaddingMismatch_CWE354`, `RejectsOutOfRangePKCS7Padding`, `RejectsWrongKey`, `RejectsTruncatedAndUnalignedPayloads`).
+- **`docs/codemender_findings.json`:** Normalized `file_path` to repo-relative `lib/DeviceCrypto/DeviceCrypto.cpp` (removing the personal path prefix) and updated `status` to `"RESOLVED"`.
+- **`lib/OTACerts/OTACerts.h`, `modules/OTAUpdateManager/OTAUpdateManager.cpp`, `modules/OTAUpdateManager/web/ota.js`, `docs/developer/ota-update-system.md`:** Removed stale `setInsecure()` comments (`useDefaultCertBundle()` + `IOTAVerifier`) and aligned `ECDSA` terminology to `RSA-2048`.
+- **`sample-app/platformio.ini`, `template-app/platformio.ini`:** Aligned `[env:esp32s3nano]` with root `platformio.ini` (`board = arduino_nano_esp32`, `upload_protocol = esptool`, `board_upload.arduino.flash_extra_images =`, `-DARDUINO_USB_MODE=1`, `-DARDUINO_USB_CDC_ON_BOOT=1`).
+- **`CHANGELOG.md`:** Recorded `DeviceCrypto` CWE-354 fix, `esp32s3nano` alignment, OTA TLS/RSA-2048 terminology updates, `#320`/`#322` DHCP NTP/TZ, and `#144`/`#326` CI & web test gates under `[1.0.0-beta.1]`.
+
+### Verification Status
+- **Observed directly in this session:**
+  - `pytest scripts/tests/`: `93 passed` (`0.34s`, exit `0`).
+  - `python3 scripts/doc_lint.py`: exit `0`.
+  - `python3 scripts/check_doc_cpp_samples.py`: `49` contracts PASSED, `41` samples PASSED, `130` SKIPPED, `0` FAILED (`8.01s`).
+  - `python3 -m json.tool docs/codemender_findings.json`: valid JSON (exit `0`).
+  - `bash .agents/skills/framework-expert/scripts/release-audit-checks.sh .`: `22/25` passed (`set_insecure_usage`: `PASS`, `hits: 0`; `findings: 3`).
+  - `git status --short`: only the 12 `allowed_files` plus this `WORKORDER.md` modified; `git diff --cached --name-only`: empty.
+- **Coordinator-verified suite results recorded for receipt stamping:** `web 92/92`, `native 1026/1026` (`RealDeviceCryptoTest` PASS), `native_ha 1050/1050`, `sample-app` & `template-app` `esp32s3nano` `SUCCESS`, `gitleaks` `0` leaks.

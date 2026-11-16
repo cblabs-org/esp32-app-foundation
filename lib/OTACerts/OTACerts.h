@@ -17,9 +17,11 @@
  *              WiFiClientSecure::setCACert() parses all PEM certificates present in
  *              a single concatenated buffer.
  *
- *              If validation fails (due to a future CA rotation), the clients fall back
- *              gracefully to setInsecure() with warning logs, relying on the firmware
- *              cryptographic signature as the absolute trust anchor.
+ *              If pinned CA validation fails (e.g., due to a future CA rotation),
+ *              OTAUpdateManager falls back to useDefaultCertBundle() (the ESP-IDF
+ *              root CA bundle) with warning logs — never unverified TLS — while
+ *              enforcing fail-closed RSA-2048 signature verification (IOTAVerifier)
+ *              on manifests and firmware binaries.
  */
 
 #pragma once

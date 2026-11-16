@@ -31,7 +31,7 @@
  *   - endUpdate():          Legacy: finalize the direct OTA update
  *   - markAppValid():       Bless the running firmware
  *   - rollbackFirmware():   Revert to the previous firmware partition
- *   - handleSignedUpload():  Multipart upload handler with ECDSA verification
+ *   - handleSignedUpload():  Multipart upload handler with RSA-2048 verification
  *   - registerMCPTools():     Register ota_get_status, ota_check_now, ota_trigger_update MCP tools
  *   - registerRoutes():     Register REST API route handlers
  *   - getConfigNamespace(): Return "ota" (IConfigurable)
@@ -623,7 +623,7 @@ void OTAUpdateManager::performUpdateTask() {
         _lastOtaError = "FrameworkSecureClient heap allocation failed";
         return;
     }
-    // Use ESP-IDF root CA bundle for TLS validation instead of setInsecure().
+    // Use ESP-IDF root CA bundle for TLS certificate validation.
     // This protects the optional otaToken bearer token from MitM exposure.
     client->useDefaultCertBundle();
     ESP_LOGI(TAG, "FrameworkSecureClient allocated on heap");
@@ -911,7 +911,7 @@ bool OTAUpdateManager::fetchAndVerifyManifest_(OTAManifest& manifest) {
     // Static buffer — only one OTA pipeline runs at a time (enforced by _state guard).
     // Saves stack headroom on the 16 KB OTA task.
     static char manifestBuf[4096];
-    uint8_t sigBuf[257];  // 256-byte ECDSA sig + 1 for null terminator appended by downloadRawFile_()
+    uint8_t sigBuf[257];  // 256-byte RSA-2048 sig + 1 for null terminator appended by downloadRawFile_()
 
     for (int i = 0; i < urlCount; ++i) {
         const char* manifestUrl = urls[i];
@@ -1348,12 +1348,12 @@ esp_err_t OTAUpdateManager::finaliseSignedUpload(PsychicResponse* response) {
             return ESP_FAIL;
         }
 
-        ESP_LOGI(TAG, "Upload: verifying ECDSA signature (%u sig bytes, %u firmware bytes)...",
+        ESP_LOGI(TAG, "Upload: verifying RSA-2048 signature (%u sig bytes, %u firmware bytes)...",
                  (unsigned)_uploadSigLen, (unsigned)_uploadBinSize);
 
         if (_uploadVerifier == nullptr ||
             !_uploadVerifier->verify(_uploadSigBuf, _uploadSigLen)) {
-            ESP_LOGE(TAG, "Upload: ECDSA verification FAILED — firmware rejected");
+            ESP_LOGE(TAG, "Upload: RSA-2048 verification FAILED — firmware rejected");
             Update.abort();
             delete _uploadVerifier;
             _uploadVerifier = nullptr;
@@ -1362,7 +1362,7 @@ esp_err_t OTAUpdateManager::finaliseSignedUpload(PsychicResponse* response) {
             return ESP_FAIL;
         }
 
-        ESP_LOGI(TAG, "Upload: ECDSA verification PASSED ✓");
+        ESP_LOGI(TAG, "Upload: RSA-2048 verification PASSED ✓");
     } else {
         ESP_LOGW(TAG, "Upload: no public key configured — signature check SKIPPED");
     }

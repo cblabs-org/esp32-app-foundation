@@ -1,9 +1,11 @@
 /*
- * ESP32 App Foundation (c) 2026
+ * ESP32 App Foundation (c) 2026 CB Labs
+ *
+ * https://github.com/cblabs-org/esp32-app-foundation
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Module: lib/DeviceCrypto/deviceCrypto.cpp
+ * Module: lib/DeviceCrypto/DeviceCrypto.cpp
  * Description: Generic cryptographic utility module providing AES-256-CBC 
  *              encryption and decryption bounded to a persistent hardware key.
  */
@@ -85,7 +87,7 @@ size_t DeviceCrypto::removePKCS7Padding(const uint8_t* buffer, size_t paddedLen)
     
     for (size_t i = 0; i < paddingValue; i++) {
         if (buffer[paddedLen - 1 - i] != paddingValue) {
-            return paddedLen;
+            return 0;
         }
     }
     return paddedLen - paddingValue;

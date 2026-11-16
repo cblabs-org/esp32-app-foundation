@@ -567,7 +567,7 @@
   // -------------------------------------------------------------------------
   // Card 4: Signed firmware upload — POST /api/ota/upload (multipart)
   // Uses XMLHttpRequest directly (bypasses ApiQueue) for upload progress tracking.
-  // Firmware is rejected server-side if ECDSA verification fails.
+  // Firmware is rejected server-side if RSA-2048 signature verification fails.
   // -------------------------------------------------------------------------
   document.getElementById('btn-ota-upload').addEventListener('click', () => {
     const binInput  = document.getElementById('ota-file-bin');
