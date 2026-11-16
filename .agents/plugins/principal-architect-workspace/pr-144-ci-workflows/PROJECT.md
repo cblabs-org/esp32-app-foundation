@@ -72,9 +72,9 @@ work_orders:
   slug: wo5-doc-cpp-samples-linux-fix
   title: Fix WifiManager.hpp header casing and add PCH acceleration to check_doc_cpp_samples.py
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: 5fb4210d646d9c7abf9f877af0a8cb8d4bc6b905
 ---
 
 # PR-144 — ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144)

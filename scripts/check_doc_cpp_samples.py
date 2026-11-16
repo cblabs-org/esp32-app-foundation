@@ -23,6 +23,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from typing import Optional
 
@@ -97,7 +98,7 @@ BASE_PREAMBLE = """
 #include "EventBus.hpp"
 #include "MCPServer.hpp"
 #include "MCPToolRegistry.hpp"
-#include "WiFiManager.hpp"
+#include "WifiManager.hpp"
 #include "DataManager.hpp"
 #include "PsychicHttp.h"
 #include "WiFiClientSecure.h"
@@ -344,7 +345,7 @@ def check_explicit_skip(block: CodeBlock) -> tuple[bool, str]:
     return False, ""
 
 
-def synthesize_contract_candidate(code: str) -> str:
+def synthesize_contract_candidate(code: str, preamble: str = BASE_PREAMBLE) -> str:
     """Synthesizes candidate compilation unit for contract/class/struct definitions."""
     # Extract top-level #include and #pragma lines to keep them outside the namespace
     includes_top = []
@@ -370,7 +371,7 @@ def synthesize_contract_candidate(code: str) -> str:
                 )
 
     parity_str = "\n".join(checks)
-    return f"""{BASE_PREAMBLE}
+    return f"""{preamble}
 {top_str}
 
 namespace doc_sample {{
@@ -389,14 +390,14 @@ using ::IDisplayBoard;
 """
 
 
-def synthesize_method_candidate(code: str) -> Optional[str]:
+def synthesize_method_candidate(code: str, preamble: str = BASE_PREAMBLE) -> Optional[str]:
     """Synthesizes candidate compilation unit for out-of-line method definitions."""
     match = re.search(r"\b(\w+)::(\w+)\s*\(", code)
     if not match:
         return None
     cls_name = match.group(1)
 
-    return f"""{BASE_PREAMBLE}
+    return f"""{preamble}
 namespace doc_sample {{
 using ::PsychicHttpServer;
 using ::MCPServer;
@@ -431,9 +432,9 @@ public:
 """
 
 
-def synthesize_runner_candidate(code: str) -> str:
+def synthesize_runner_candidate(code: str, preamble: str = BASE_PREAMBLE) -> str:
     """Synthesizes candidate compilation unit for statement/expression snippets."""
-    return f"""{BASE_PREAMBLE}
+    return f"""{preamble}
 void __doc_sample_runner() {{
     uint32_t currentMillis = 1000;
     Application app;
@@ -464,7 +465,12 @@ def compile_candidate(cmd: list[str], source: str) -> tuple[bool, str]:
         return False, str(e)
 
 
-def check_single_block(block: CodeBlock, compiler_cmd: list[str], strict: bool = False) -> CheckResult:
+def check_single_block(
+    block: CodeBlock,
+    compiler_cmd: list[str],
+    strict: bool = False,
+    preamble: str = BASE_PREAMBLE,
+) -> CheckResult:
     """Checks a single C++ code block across candidate compilation strategies."""
     # Check known spec exemptions
     exemption_key = (block.file_path, block.start_line)
@@ -523,19 +529,19 @@ def check_single_block(block: CodeBlock, compiler_cmd: list[str], strict: bool =
 
     # Priority 1: Contract / Namespace wrapper
     if is_contract:
-        candidates.append(("CONTRACT", synthesize_contract_candidate(code)))
+        candidates.append(("CONTRACT", synthesize_contract_candidate(code, preamble)))
 
     # Priority 2: Method implementation host
     if is_method:
-        method_cand = synthesize_method_candidate(code)
+        method_cand = synthesize_method_candidate(code, preamble)
         if method_cand:
             candidates.append(("METHOD", method_cand))
 
     # Priority 3: Top-level translation unit
-    candidates.append(("SAMPLE", f"{BASE_PREAMBLE}\n{code}\n"))
+    candidates.append(("SAMPLE", f"{preamble}\n{code}\n"))
 
     # Priority 4: Execution runner for statements
-    candidates.append(("RUNNER", synthesize_runner_candidate(code)))
+    candidates.append(("RUNNER", synthesize_runner_candidate(code, preamble)))
 
     last_error = ""
     for kind, cand_src in candidates:
@@ -660,10 +666,53 @@ def main() -> int:
     start_time = time.time()
     results: list[CheckResult] = []
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
-        futures = {executor.submit(check_single_block, b, compiler_cmd, args.strict): b for b in all_blocks}
-        for future in concurrent.futures.as_completed(futures):
-            results.append(future.result())
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        preamble_path = Path(tmp_dir) / "doc_preamble.hpp"
+        preamble_path.write_text("#pragma once\n" + BASE_PREAMBLE, encoding="utf-8")
+
+        base_flags = (
+            compiler_cmd[:-3]
+            if compiler_cmd[-3:] == ["-x", "c++", "-"]
+            else list(compiler_cmd)
+        )
+        pch_flags = [f for f in base_flags if f != "-fsyntax-only"]
+
+        effective_cmd = compiler_cmd
+        effective_preamble = BASE_PREAMBLE
+        is_clang = "clang" in Path(compiler_path).name.lower()
+
+        try:
+            ext, include_flag, include_target = (
+                (".pch", "-include-pch", f"{preamble_path}.pch")
+                if is_clang
+                else (".gch", "-include", str(preamble_path))
+            )
+            pch_out = f"{preamble_path}{ext}"
+            proc = subprocess.run(
+                [*pch_flags, "-x", "c++-header", str(preamble_path), "-o", pch_out],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if proc.returncode == 0 and Path(pch_out).is_file():
+                effective_cmd = [*base_flags, include_flag, include_target, "-x", "c++", "-"]
+                effective_preamble = ""
+        except (subprocess.SubprocessError, OSError):
+            pass
+
+        if args.verbose:
+            pch_status = "enabled" if effective_preamble == "" else "fallback to BASE_PREAMBLE"
+            print(f"PCH precompilation: {pch_status}")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+            futures = {
+                executor.submit(
+                    check_single_block, b, effective_cmd, args.strict, effective_preamble
+                ): b
+                for b in all_blocks
+            }
+            for future in concurrent.futures.as_completed(futures):
+                results.append(future.result())
 
     duration = time.time() - start_time
 

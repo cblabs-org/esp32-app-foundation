@@ -4,7 +4,7 @@ wo_id: WO-144.5
 pr_id: PR-144
 title: Fix WifiManager.hpp header casing and add PCH acceleration to check_doc_cpp_samples.py
 complexity: standard
-status: PENDING
+status: COMPLETED
 allowed_files:
 - scripts/check_doc_cpp_samples.py
 forbidden_files:
@@ -17,7 +17,28 @@ verification_command: pytest scripts/tests/ && python3 scripts/doc_lint.py && py
 max_attempts: 5
 max_structural_failures: 2
 spec_hash: ed4e3578d14f7acd1e4925fb32262791f807465a3f9555b8e68f5baae6cf4a50
-completion: null
+completion:
+  status: COMPLETED
+  attempt_num: 1
+  receipt_id: rcpt_e11b6225025e
+  commit_sha: 5fb4210d646d9c7abf9f877af0a8cb8d4bc6b905
+  files_modified:
+  - scripts/check_doc_cpp_samples.py
+  verification_summary: pytest 93/93, doc_lint exit 0, check_doc_cpp_samples.py 49
+    contracts + 41 samples PASSED, 130 SKIPPED, 0 FAILED (7.89s default, 7.33s clang++,
+    7.97s g++), --dump 401 & fallback verified; unstaged for Coordinator receipt stamping.
+  out_of_scope_findings: []
+  escalation_request: null
+  decisions_made:
+  - 'Fixed #include "WiFiManager.hpp" -> #include "WifiManager.hpp" in BASE_PREAMBLE
+    to match modules/WifiManager/WifiManager.hpp on case-sensitive Linux.'
+  - 'Parameterized synthesize_contract_candidate, synthesize_method_candidate, synthesize_runner_candidate,
+    and check_single_block with preamble: str = BASE_PREAMBLE so --dump preserves
+    full preamble output.'
+  - Added one-time doc_preamble.hpp PCH precompilation in main() inside tempfile.TemporaryDirectory(),
+    stripping ["-x", "c++", "-"] and omitting -fsyntax-only during precompile for
+    clang++ (.pch/-include-pch) and g++ (.gch/-include) with safe fallback to BASE_PREAMBLE.
+  dead_ends: []
 ---
 
 # WO-144.5 — Fix WifiManager.hpp header casing and add PCH acceleration to check_doc_cpp_samples.py
@@ -70,4 +91,18 @@ Scope is strictly bounded to `scripts/check_doc_cpp_samples.py`.
 
 ## Completion Report
 
-*(Pending execution by Tier-3 Worker.)*
+Implemented all `WO-144.5` changes strictly inside `scripts/check_doc_cpp_samples.py` and left all edits unstaged for Coordinator verification and central receipt stamping (`pa wo verify` and `git add`/`git commit` not run per dispatch instructions):
+
+- **`scripts/check_doc_cpp_samples.py` (`L26`, `L101`):** Added `import tempfile` and fixed `#include "WiFiManager.hpp"` -> `#include "WifiManager.hpp"` in `BASE_PREAMBLE` to match `modules/WifiManager/WifiManager.hpp` on case-sensitive Linux.
+- **`scripts/check_doc_cpp_samples.py` (`L348`, `L393`, `L435`, `L468-L545`):** Added `preamble: str = BASE_PREAMBLE` to `synthesize_contract_candidate`, `synthesize_method_candidate`, `synthesize_runner_candidate`, and `check_single_block`, replacing hardcoded `{BASE_PREAMBLE}` with `{preamble}` while keeping `BASE_PREAMBLE` as default so `--dump` output is unchanged.
+- **`scripts/check_doc_cpp_samples.py` (`L669-L716`):** Added one-time `doc_preamble.hpp` PCH precompilation inside `with tempfile.TemporaryDirectory() as tmp_dir:` in `main()`, stripping trailing `["-x", "c++", "-"]` (`base_flags`) and omitting `-fsyntax-only` (`pch_flags`) during precompile (`timeout=30`), using `.pch` + `-include-pch` for `clang` and `.gch` + `-include` for `g++`, verifying `proc.returncode == 0 and Path(pch_out).is_file()`, and falling back safely to `compiler_cmd` + `BASE_PREAMBLE` on any failure.
+
+### Verification Results
+- `pytest scripts/tests/`: `93 passed in 0.32s` (exit `0`).
+- `python3 scripts/doc_lint.py`: exit `0`.
+- `python3 scripts/check_doc_cpp_samples.py`: `Scanned files: 34`, `Total C++ blocks: 220`, `Contracts verified: 49 PASSED`, `Samples verified: 41 PASSED`, `Skipped blocks: 130 SKIPPED`, `Failed blocks: 0 FAILED`, `Elapsed time: 7.89s` (baseline before PCH: `22.27s`).
+- `python3 scripts/check_doc_cpp_samples.py --compiler clang++`: `49` contracts + `41` samples PASSED, `130` SKIPPED, `0` FAILED (`7.33s`).
+- `python3 scripts/check_doc_cpp_samples.py --compiler g++`: `49` contracts + `41` samples PASSED, `130` SKIPPED, `0` FAILED (`7.97s`).
+- `python3 scripts/check_doc_cpp_samples.py --dump 401 docs/design_specification.md`: emitted full `BASE_PREAMBLE` including `#include "WifiManager.hpp"` and `FrameworkConfig`.
+- Simulated precompile failure fallback check (`docs/developer/creating-a-module.md`): `PCH precompilation: fallback to BASE_PREAMBLE`, `4 PASSED`, `0 FAILED` (exit `0`).
+- `git diff --cached --name-only`: empty (all changes unstaged).
