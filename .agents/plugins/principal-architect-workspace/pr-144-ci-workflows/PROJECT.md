@@ -59,3 +59,15 @@ work_orders:
 4. **GitHub Actions Pipeline (`.github/workflows/ci.yml`) & `README.md`:** Implement four CI jobs using `submodules: recursive` on every `actions/checkout@v4` step (`lint-and-secrets` with direct MIT `gitleaks` v8.24.2 binary download running `gitleaks detect --config .gitleaks.toml --log-opts="--all" --redact --verbose`, `doc_lint.py`, and `pytest`; `web-tests` running `scripts/run_web_tests.py` under `CI=true` without `SKIP_WEB_TESTS`; `native-tests` running `pio test -e native`, `pio test -e native_ha`, and `check_doc_cpp_samples.py`; and `firmware-build` running the 6 grouped multi-env legs building all 14 environments across root/`sample-app`/`template-app` with per-leg `~/.platformio` caching plus the `/tmp/pathb-smoke` git-submodule Path B consumer build) and add the CI status badge to `README.md`.
 
 ## 4. Outcome & Session Log
+
+### Completed Work Orders
+- **`WO-144.1` (`071ad40234836301e5010938bcbfbe63fcbef86c`, `rcpt_c9c1110bea29`, `tree_hash: c9c1110bea29c6e72ae96db20a50e2b5ec20d5cf7d9950c44f1d2073c959fc2a`)** — Added `.gitleaks.toml` (verbatim from `launch/pr-a-sensitive-review`), pinned `pioarduino` `platform-espressif32` `55.03.311` across `platformio.ini`, `sample-app/platformio.ini`, and `template-app/platformio.ini` (plus `QUALITY GATE NOTE` update), configured `test/web/playwright.config.ts` reporter as `[['list'], ['html', { open: 'never' }]]`, hardened `scripts/run_web_tests.py` to fail closed in `CI` unless `SKIP_WEB_TESTS` is truthy (`1`/`true`/`yes`) with pre-step `node --test ble_lifecycle.test.js` and zero-Playwright-test guard, added hermetic pytest suite `scripts/tests/test_run_web_tests.py`, authored `.github/workflows/ci.yml` (`lint-and-secrets`, `web-tests`, `native-tests`, and 6-leg/14-env `firmware-build` matrix + `/tmp/pathb-smoke` submodule consumer build with `submodules: recursive` across all 4 jobs), and added the CI badge to `README.md`.
+
+### Verification Summary (Pre-Step 6A Audit)
+- `pytest scripts/tests/`: `93 passed in 0.29s`
+- `python3 scripts/doc_lint.py`: exit `0`
+- `gitleaks detect --config .gitleaks.toml --log-opts="--all" --redact`: `1314 commits scanned`, `no leaks found` (`.gitleaks.toml` identical to `launch/pr-a-sensitive-review`)
+- `CI=true python3 scripts/run_web_tests.py`: `1/1` Node test (`ble_lifecycle.test.js`) + `92 passed` Playwright E2E tests
+- PlatformIO MCP `run_tests` (`native`): `1020 test cases: 1020 succeeded in 00:01:11.635`
+- `python3 scripts/check_doc_cpp_samples.py`: `49` contracts passed, `41` samples passed, `0` failed (`22.76s`)
+- PlatformIO MCP `build_project` (`pioarduino` `55.03.311` zip pin): root `esp32dev` `SUCCESS` (`RAM: 17.8%`, `Flash: 85.6%`) and `sample-app` `esp32dev` `SUCCESS` (`RAM: 17.9%`, `Flash: 94.6%`)
