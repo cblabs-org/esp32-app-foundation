@@ -17,6 +17,7 @@ charter:
   - sample-app/platformio.ini
   - template-app/platformio.ini
   - scripts/run_web_tests.py
+  - scripts/check_doc_cpp_samples.py
   - scripts/tests/
   - test/web/playwright.config.ts
   - modules/LVGLDisplay/LVGLDisplay.hpp
@@ -32,7 +33,7 @@ charter:
   verification_floor:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
-  charter_hash: 840481209534f8091141c695fd57a8399150e2fd0f2f4541ae9ca29aa945516d
+  charter_hash: 62e2fe8d4b7ca8db4ff0ca5ef8611c8cf8b5ca4a6307d9052b21b25b51d7cefb
 status: GRADUATED
 approved_at: '2026-11-15T23:45:43.180039Z'
 github_pr: null
