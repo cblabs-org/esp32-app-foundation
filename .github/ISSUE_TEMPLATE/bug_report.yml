@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in the framework builds wrongly, crashes or behaves incorrectly.
+title: "[Module/Area] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please don't include Wi-Fi passwords, API keys, tokens or other secrets in logs you paste.
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Symptom
+      description: What goes wrong, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The smallest set of steps, code or config that shows the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Compiler output, serial log, backtrace, or file:line references.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Framework version or commit
+      description: The tag (e.g. v1.0.0-beta.1) or commit SHA you built against. The portal's System tab and /api/system show the firmware version.
+    validations:
+      required: true
+  - type: input
+    id: board
+    attributes:
+      label: Board and PlatformIO environment
+      placeholder: "e.g. Waveshare ESP32-S3-Nano, env esp32s3nano"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Your application
+      description: Optional. Which modules and WITH_* flags you use, or a link to your project.
+  - type: textarea
+    id: fix
+    attributes:
+      label: Suggested fix
+      description: Optional, but welcome if you have one.

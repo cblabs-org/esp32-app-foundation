@@ -84,8 +84,8 @@ void loop() {
 To prevent application code from coupling directly to internal framework paths, the framework provides a single include header: [AppFoundation.h](../../include/AppFoundation.h).
 
 This file transitively includes:
-- Structural configurations ([FrameworkConfig.hpp](../../include/FrameworkConfig.hpp))
-- Operational state enums ([AppState.hpp](../../include/AppState.hpp))
+- Structural configurations ([FrameworkConfig.hpp](../../include/types/FrameworkConfig.hpp))
+- Operational state enums ([AppState.hpp](../../include/types/AppState.hpp))
 - All extension interfaces from `include/interfaces/`
 - All event payloads from `include/events/` ([DataSourceHealthPayload.hpp](../../include/events/DataSourceHealthPayload.hpp), [PreconditionHealthPayload.hpp](../../include/events/PreconditionHealthPayload.hpp), [AppConfiguringPayload.hpp](../../include/events/AppConfiguringPayload.hpp))
 - The composition root header ([Application.hpp](../../modules/Application/Application.hpp))
@@ -204,9 +204,9 @@ Application modules interact with framework subsystems by implementing one or mo
 | [IPreconditionContributor](../../include/interfaces/IPreconditionContributor.hpp) | Registers preconditions that must be met before transition to RUNNING state. | `registerPreconditions()` |
 | [IDataSource](../../include/interfaces/IDataSource.hpp) | Scheduled background data fetch worker managed by `DataManager`. | `fetchUpdate()` |
 | [IStatusReporter](../../include/interfaces/IStatusReporter.hpp) | Displays boot-phase progress status and unrecoverable errors. | `reportStatus(const char*, float)` |
-| [IBootReporter](../../modules/Application/interfaces/IBootReporter.hpp) | Early hardware initialisation reporter (extends `IStatusReporter`). | `beginEarly()` |
+| [IBootReporter](../../include/interfaces/IBootReporter.hpp) | Early hardware initialisation reporter (extends `IStatusReporter`). | `beginEarly()` |
 | [IDisplayModule](../../include/interfaces/IDisplayModule.hpp) | Unified display provider contract for geometry, brightness, PNG capture, and system state. | `capturePNG(Print&)` |
-| [IDisplayBoard](../../include/interfaces/IDisplayBoard.hpp) | Renders a telemetry pane inside the monochrome display carousel. | `render(U8G2&)` |
+| [IDisplayBoard](../../modules/U8G2Display/IDisplayBoard.hpp) | Renders a telemetry pane inside the monochrome display carousel. | `render(U8G2&)` |
 | [IOTAVerifier](../../include/interfaces/IOTAVerifier.hpp) | Streaming cryptographic firmware verification for OTA updates. | `verify(const uint8_t*, size_t)` |
 
 For detailed information on implementing these interfaces, see the [Extension Points & Interfaces](../design_specification.md#6-extension-points--interfaces) section in the Design Specification.
@@ -255,7 +255,7 @@ For more details on the boot phases and state transitions, refer to the [Applica
 
 ## 9. Flash Partition & LittleFS Directory Layout
 
-The framework uses a **dual-partition** LittleFS layout. The custom partition table ([partitions.esp32dev.csv](../../partitions.esp32dev.csv)) defines two data partitions:
+The framework uses a **dual-partition** LittleFS layout. The custom partition table ([hardware/esp32dev/partitions.csv](../../hardware/esp32dev/partitions.csv)) defines two data partitions:
 
 | Partition | Label | Size | Mount Point | Purpose |
 | :--- | :--- | :--- | :--- | :--- |

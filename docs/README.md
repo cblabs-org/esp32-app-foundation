@@ -55,11 +55,11 @@ A design document folds into the specification when — and only when — its de
 
 | Document | Lines | Status | Disposition |
 |---|---|---|---|
-| [`config-gate-design.md`](archive/config-gate-design.md) | 1482 | IMPLEMENTED | **Archived** — folded into v2.0 §8/§9. Rationale at [`docs/design/config-gate.md`](design/config-gate.md) |
+| [`config-gate-design.md`](archive/config-gate-design.md) | 1482 | IMPLEMENTED | **Archived** — folded into v2.0 §8/§9. Rationale extract since deleted |
 | [`lvgl-display-design.md`](archive/lvgl-display-design.md) | 1342 | SUPERSEDED | **Archived** — superseded by LVGL Pro Editor architecture |
 | [`microkernel-architecture-design.md`](archive/microkernel-architecture-design.md) | 681 | IMPLEMENTED | **Archived** — folded into v2.0 §3–§6 |
 | [`hardware-configuration-design.md`](archive/hardware-configuration-design.md) | 743 | IMPLEMENTED | **Archived** — folded into v2.0 §12, delivered as `hardware/` |
-| [`design/logging.md`](design/logging.md) | 24 | IMPLEMENTED | **Deleted** — folded into §11A |
+| `design/logging.md` | 24 | IMPLEMENTED | **Deleted** — folded into §11A |
 
 ---
 
@@ -71,7 +71,7 @@ Point-in-time assessments, early evaluations, and superseded designs preserved f
 - [Embedded Best Practices Assessment](archive/embedded-best-practices-assessment.md) — initial review (2026-05-31)
 - [Comparative Analysis Report](archive/comparative_analysis_report.md) — T1/T2 agent comparison
 - [LVGL Display Module — Design Document (Historical)](archive/lvgl-display-design.md) — SquareLine Studio era (superseded by LVGL Pro Editor architecture)
-- [Configuration Gate Design (Historical)](archive/config-gate-design.md) — folded into v2.0 §8/§9; rationale at `docs/design/config-gate.md`
+- [Configuration Gate Design (Historical)](archive/config-gate-design.md) — folded into v2.0 §8/§9
 - [Microkernel Architecture Design (Historical)](archive/microkernel-architecture-design.md) — folded into v2.0 §3–§6
 - [Hardware Configuration Design (Historical)](archive/hardware-configuration-design.md) — folded into v2.0 §12; delivered as `hardware/`
 

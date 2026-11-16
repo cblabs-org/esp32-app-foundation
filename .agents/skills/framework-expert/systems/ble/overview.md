@@ -74,6 +74,6 @@ The ESP32-S3 shares a single 2.4 GHz RF front-end between Wi-Fi and Bluetooth LE
  
 ## Cross-References
  
-- **Developer Guide:** [`docs/developer/bluetooth.md`](../../../../docs/developer/bluetooth.md)
-- **Module Source:** [`modules/BLEManager/`](../../../../modules/BLEManager/)
-- **Provider Interfaces:** [`modules/BLEManager/IBLEServiceProvider.hpp`](../../../../modules/BLEManager/IBLEServiceProvider.hpp), [`modules/BLEManager/IBLEClientProvider.hpp`](../../../../modules/BLEManager/IBLEClientProvider.hpp)
+- **Developer Guide:** [`docs/developer/bluetooth.md`](../../../../../docs/developer/bluetooth.md)
+- **Module Source:** [`modules/BLEManager/`](../../../../../modules/BLEManager/)
+- **Provider Interfaces:** [`modules/BLEManager/IBLEServiceProvider.hpp`](../../../../../modules/BLEManager/IBLEServiceProvider.hpp), [`modules/BLEManager/IBLEClientProvider.hpp`](../../../../../modules/BLEManager/IBLEClientProvider.hpp)

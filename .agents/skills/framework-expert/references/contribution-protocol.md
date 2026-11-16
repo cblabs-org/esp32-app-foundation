@@ -80,7 +80,7 @@ Contributions must strictly respect the framework's versioning policy:
 ## Authority & Contribution Origins
 
 - **PR & Proposal Authorization:** Filing PRs and proposal issues is authorized for PA-tier agents and above. Tier-3 worker agents must surface findings and recommendations to their PA.
-- **Consumer-Originated Contributions:** Framework contributions originating from consumer app projects must be branched in-tree within the framework repository (not forks), utilizing `found-by:<consumer>` attribution labels.
+- **Consumer-Originated Contributions:** Maintainer-owned consumer programs branch in-tree within the framework repository and use `found-by:<consumer>` attribution labels. External contributors work from a fork and open a pull request against `main`.
 
 ---
 

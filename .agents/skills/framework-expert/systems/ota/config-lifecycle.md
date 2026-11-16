@@ -63,7 +63,7 @@ If new firmware crashes before `markAppValid()`:
 
 ## Cross-References
 
-- **Human docs:** [`docs/developer/ota-update-system.md`](../../../../docs/developer/ota-update-system.md) § Config Lifecycle
+- **Human docs:** [`docs/developer/ota-update-system.md`](../../../../../docs/developer/ota-update-system.md) § Config Lifecycle
 - **Config system overview:** [`systems/config/overview.md`](../config/overview.md)
 - **Config persistence:** [`systems/config/persistence.md`](../config/persistence.md)
 - **OTA overview:** [`systems/ota/overview.md`](overview.md)

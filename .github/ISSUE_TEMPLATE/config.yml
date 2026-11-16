@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/cblabs-org/esp32-app-foundation/security/advisories/new
+    about: Please report vulnerabilities privately, not as a public issue. See SECURITY.md.
+  - name: Developer documentation
+    url: https://github.com/cblabs-org/esp32-app-foundation/blob/main/docs/developer/README.md
+    about: Guides for building apps and modules on the framework.
