@@ -396,3 +396,9 @@
 | Project | Scope | Context |
 |---|---|---|
 | [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## scripts/check_doc_cpp_samples.py
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
