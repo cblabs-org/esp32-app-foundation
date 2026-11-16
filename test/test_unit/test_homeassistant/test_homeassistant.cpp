@@ -5,9 +5,6 @@
  * Description: Implementation of HomeAssistantTest, HomeAssistantBackoffTest classes.
  */
 
-#define MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED
-int mock_mqtt_publish_return_value = 0;
-
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
 
@@ -92,8 +89,9 @@ TEST_F(HomeAssistantTest, SwitchDiscoveryIncludesCommandTopic) {
 
 class HomeAssistantBackoffTest : public ::testing::Test {
 protected:
-    HomeAssistantModule ha;
+    // Declared before ha so eventBus outlives ~HomeAssistantModule() unsubscribe calls.
     EventBus eventBus;
+    HomeAssistantModule ha;
     HaSensor* sensors[6];
     bool stallEventReceived = false;
 
@@ -106,6 +104,7 @@ protected:
     std::string sensorNames[6];
 
     void SetUp() override {
+        setMockMillis(0);
         mock_mqtt_publish_return_value = 0;
         ha.setEventBus(&eventBus);
         eventBus.subscribe("ha.discovery.stalled", onStallEvent, this);
@@ -123,7 +122,8 @@ protected:
         ha._discoveryIndex = 0;
         ha._retryIntervalMs = 0;
         ha._lastRetryAttemptMs = 0;
-        ha._drainStartMs = 1000;
+        ha._drainTimer.setInterval(HomeAssistantModule::DRAIN_STALL_TIMEOUT_MS);
+        ha._drainTimer.reset(1000);
         ha._drainStallReported = false;
         ha._entitiesSkipped = 0;
         
@@ -135,6 +135,7 @@ protected:
         for (int i = 0; i < 6; i++) {
             delete sensors[i];
         }
+        setMockMillis(0);
     }
 };
 
@@ -259,8 +260,10 @@ TEST_F(HomeAssistantBackoffTest, RepublishAfterDrainDoesNotFalseStall) {
     uint32_t republishTime = 1000 + 60000;  // 60s after original drain start
     
     // Trigger republish (e.g. channel label edit) — resetDrainState() must reset drainStartMs
+    setMockMillis(republishTime);
     ha.republishDiscovery();
     EXPECT_TRUE(ha._discoveryPending);
+    EXPECT_EQ(ha._drainTimer.getLastFire(), republishTime);
     
     // First tick of the new drain — should NOT fire stall
     mock_mqtt_publish_return_value = -1;  // Force a failure so we enter the stall-check path

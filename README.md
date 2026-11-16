@@ -6,6 +6,7 @@
 
 **A modular C++ firmware framework for ESP32 devices: you write the application modules, the framework provides the device.**
 
+[![CI](https://github.com/cblabs-org/esp32-app-foundation/actions/workflows/ci.yml/badge.svg)](https://github.com/cblabs-org/esp32-app-foundation/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Status: 1.0 public beta](https://img.shields.io/badge/status-1.0%20public%20beta-yellow)](#project-status)
 [![Latest release](https://img.shields.io/github/v/release/cblabs-org/esp32-app-foundation?include_prereleases&sort=semver)](https://github.com/cblabs-org/esp32-app-foundation/releases)

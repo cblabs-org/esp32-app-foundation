@@ -43,6 +43,7 @@ static void event_trampoline(void* handler_arg, esp_event_base_t base, int32_t i
 void EventBus::begin() {
     ESP_LOGI(TAG, "Initializing EventBus");
 #ifdef UNIT_TEST
+    std::lock_guard<std::recursive_mutex> lock(_unitMutex);
     _subscribers.clear();
     _dispatchDepth = 0;
     _needsCleanup = false;
@@ -62,6 +63,7 @@ void EventBus::_ensureEventLoop() {
 
 #ifdef UNIT_TEST
 void EventBus::cleanup() {
+    std::lock_guard<std::recursive_mutex> lock(_unitMutex);
     _subscribers.erase(
         std::remove_if(_subscribers.begin(), _subscribers.end(),
                        [](const Subscription& s) { return !s.active; }),
@@ -89,6 +91,7 @@ bool EventBus::subscribe(const char* topic, EventCallback callback, void* ctx) {
 
     // --- Step 3: Register the subscription ---
 #ifdef UNIT_TEST
+    std::lock_guard<std::recursive_mutex> lock(_unitMutex);
     if (_dispatchDepth == 0) {
         // Reuse an inactive slot if available when not dispatching
         for (auto& sub : _subscribers) {
@@ -140,6 +143,7 @@ bool EventBus::unsubscribe(const char* topic, EventCallback callback, void* ctx)
     uint32_t topicHash = hashTopic(topic);
 
 #ifdef UNIT_TEST
+    std::lock_guard<std::recursive_mutex> lock(_unitMutex);
     for (size_t i = 0; i < _subscribers.size(); ++i) {
         if (_subscribers[i].active &&
             _subscribers[i].topicHash == topicHash &&
@@ -185,6 +189,7 @@ int EventBus::publish(const char* topic, const void* payload) {
     uint32_t topicHash = hashTopic(topic);
     int count = 0;
 #ifdef UNIT_TEST
+    std::lock_guard<std::recursive_mutex> lock(_unitMutex);
     // --- Step 3 (native): Synchronous inline dispatch ---
     // Increment dispatch depth to guard against re-entrant unsubscribe
     // mutating the vector while we iterate.
@@ -193,7 +198,9 @@ int EventBus::publish(const char* topic, const void* payload) {
     const size_t initialSize = _subscribers.size();
     for (size_t i = 0; i < initialSize; ++i) {
         if (_subscribers[i].active && _subscribers[i].topicHash == topicHash) {
-            _subscribers[i].callback(topic, payload, _subscribers[i].ctx);
+            EventCallback cb = _subscribers[i].callback;
+            void* ctx = _subscribers[i].ctx;
+            cb(topic, payload, ctx);
             count++;
         }
     }

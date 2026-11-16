@@ -51,6 +51,8 @@
 #include <cstdint>
 #include <cstddef>
 #include <atomic>
+#include <mutex>
+#include <vector>
 #include <ArduinoJson.h>
 #include "interfaces/ITickable.hpp"
 #include "events/AppConfiguringPayload.hpp"
@@ -76,6 +78,10 @@
 #endif
 #include "ui.h"
 #include "ui_gen.h"
+// Prevent LVGL private ft81x driver macro (LVGL 9.6+) from colliding with LovyanGFX Panel_M5UnitLCD::CMD_ROTATE.
+#ifdef CMD_ROTATE
+#undef CMD_ROTATE
+#endif
 
 // Forward declarations
 class EventBus;

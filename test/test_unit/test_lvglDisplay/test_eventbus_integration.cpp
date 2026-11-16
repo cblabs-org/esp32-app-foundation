@@ -19,9 +19,10 @@
 
 class LVGLEventBusIntegrationTest : public ::testing::Test {
 protected:
+    // Declared before module so eventBus outlives ~LVGLDisplayModule() unsubscribe calls.
+    EventBus eventBus;
     MockLVGLHardwareAdapter adapter;
     LVGLDisplayModule module{adapter};
-    EventBus eventBus;
 
     void SetUp() override {
         module.bootstrapHardware();

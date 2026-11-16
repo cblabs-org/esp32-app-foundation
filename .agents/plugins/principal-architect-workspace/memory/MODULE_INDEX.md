@@ -191,6 +191,7 @@
 | Project | Scope | Context |
 |---|---|---|
 | [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
 
 ## sdkconfig.defaults
 
@@ -293,3 +294,111 @@
 | Project | Scope | Context |
 |---|---|---|
 | [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) | [PROJECT.md](../pr-320-dhcp-ntp-timezone/PROJECT.md) |
+
+## .gitleaks.toml
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## .github/workflows/
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## README.md
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## sample-app/platformio.ini
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## template-app/platformio.ini
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## scripts/run_web_tests.py
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## scripts/tests/
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## test/web/playwright.config.ts
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## modules/LVGLDisplay/LVGLDisplay.hpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## modules/EventBus/EventBus.hpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## modules/EventBus/EventBus.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## test/stubs/platform/Arduino.h
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## test/test_unit/test_homeassistant/test_homeassistant.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## test/stubs/platform/portal_assets/
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## test/stubs/platform/mqtt_client.h
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## test/test_native/test_homeassistant/test_main.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |
+
+## scripts/check_doc_cpp_samples.py
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) | [PROJECT.md](../pr-144-ci-workflows/PROJECT.md) |

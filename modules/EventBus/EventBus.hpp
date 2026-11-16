@@ -24,6 +24,9 @@
 #include <stddef.h>
 #include <new>
 #include <vector>
+#ifdef UNIT_TEST
+#include <mutex>
+#endif
 
 /**
  * @brief Concurrency & Lifecycle Contract for EventBus:
@@ -134,6 +137,7 @@ private:
     std::vector<Subscription> _subscribers;
     uint32_t _dispatchDepth = 0;
     bool _needsCleanup = false;
+    std::recursive_mutex _unitMutex;
 
     void cleanup();
 #else
