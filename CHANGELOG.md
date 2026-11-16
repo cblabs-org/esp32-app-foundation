@@ -47,6 +47,9 @@ section summarises what the framework provides as of this release.
   lint and C++ sample checks, `scripts/next_version.py` for choosing the next
   release tag, agent skills (`framework-expert`, `framework-setup`,
   `framework-portal-design`).
+- **Release audit:** [v1.0.0-beta.1 release audit](docs/release-audits/v1.0.0-beta.1.md) —
+  10-dimension pre-release gate across code discipline, memory budgets, security,
+  web portal, CI build integrity, and live `esp32s3nano` soak telemetry.
 
 ### Since the last internal build (`v0.0.12-beta.4`)
 
