@@ -4,7 +4,7 @@ wo_id: WO-327.3
 pr_id: PR-327
 title: Remediate Round 1 audit findings in docs/release-audits/v1.0.0-beta.1.md
 complexity: standard
-status: PENDING
+status: COMPLETED
 allowed_files:
 - docs/release-audits/v1.0.0-beta.1.md
 forbidden_files:
@@ -18,7 +18,20 @@ verification_command: pytest scripts/tests/ && python3 scripts/doc_lint.py && py
 max_attempts: 5
 max_structural_failures: 2
 spec_hash: 2f260f454511244ecc7f722b71b8e1ca6ff27f12106d7455839aa91426397e96
-completion: null
+completion:
+  status: COMPLETED
+  attempt_num: 1
+  receipt_id: rcpt_06fbeff3f72a
+  commit_sha: f9512cf2b4387175ff6e97f112256b78cc857d13
+  files_modified:
+  - docs/release-audits/v1.0.0-beta.1.md
+  verification_summary: pytest 93/93, doc_lint exit 0, check_doc_cpp_samples 49+41/0
+    fail across 35 files; next_version.py --channel beta --bump major and --target
+    1.0.0 -> v1.0.0-beta.1; redaction grep clean.
+  out_of_scope_findings: []
+  escalation_request: null
+  decisions_made: []
+  dead_ends: []
 ---
 
 # WO-327.3 — Remediate Round 1 audit findings in docs/release-audits/v1.0.0-beta.1.md
@@ -79,4 +92,19 @@ You are executing `WO-327.3` on branch `launch/pr-b-release-audit` for `PR-327` 
 ## Completion Report
 <!-- Written by the Tier 3 Worker at task completion -->
 
-_Pending execution._
+All `WO-327.3` Round 1 Cold-Firewall Audit remediations in `docs/release-audits/v1.0.0-beta.1.md` are implemented and verified, with all edits left unstaged (`git diff --cached --name-only` empty; `pa wo verify` and `git add`/`git commit` not run) for Coordinator receipt stamping (`ESCALATED_TO_PA`, `COORDINATOR_RECEIPT_STAMPING`).
+
+### Implemented Changes (`docs/release-audits/v1.0.0-beta.1.md`)
+- **`BLOCKING-1` (`L164`):** Replaced `python3 scripts/next_version.py --channel beta` with `python3 scripts/next_version.py --channel beta --bump major` (or `--target 1.0.0`) — verified to output `v1.0.0-beta.1` — followed by `git tag v1.0.0-beta.1 && git push origin v1.0.0-beta.1` after merging `PR-327`.
+- **`NON-BLOCKING-1` (`CHANGELOG.md` line citations at `L32`, `L51`, `L132`, `L133`):** Updated shifted ranges to `CHANGELOG.md:10-90` (`L32`), `CHANGELOG.md:54-59` (`L51`, `L132`), and `CHANGELOG.md:62-64` (`L133`).
+- **`NON-BLOCKING-1` (D6 `hardcoded_hex_color` breakdown at `L48`):** Replaced imprecise sub-counts with the verified `41`-hit breakdown (`33` non-defects: `20` CSS token definitions + `2` `#issue` comments in `web/portal/app.css` [`22` hits], `3` matching `var(--token) || '#hex'` fallbacks + `2` `#issue` comments in `web/portal/system.js` [`5` non-defect hits], `6` HTML numeric entities / `#issue` comments across `ble.js` [`2`], `mcp.js` [`1`], `auth.js` [`1`], and `lved-runtime.js` [`2`]; plus `8` genuine `#fff` literal text assignments: `3` `system.js`, `2` `display.js`, `1` `credits.js`, `1` `keys.js`, `1` `utils.js`).
+- **`NON-BLOCKING-1` (D8 `duplicate_driver_registration` breakdown at `L49`, `L122`):** Documented the exact `7`-file `grep -rl --include="*.cpp"` breakdown (`2` authored files: `adapters/lvgl/CrowPanel128Adapter.cpp` + `modules/EncoderModule/EncoderModule.cpp` = `3` expected calls; `1` unit test stub `test/test_unit/test_lvgl_stubs/test_lvgl_stubs.cpp`; `1` library file `.pio/libdeps/crowpanel-128-rotary/lvgl/src/drivers/display/lovyan_gfx/lv_lovyan_gfx.cpp`; and `3` copies under `tmp/pathb/framework/`).
+- **`NON-BLOCKING-1` (D7 `crowpanel-128-rotary` local build timing at `L113`):** Distinguished post-`WO-327.1` `esp32s3nano` local builds (`root` `130.84s`, `sample-app` `126.59s`, `template-app` `106.97s`) from the pre-`WO-327.1` `crowpanel-128-rotary` local build (`218.03s`, `.pio-mcp-workspace/logs/build/build-2026-11-16T10-50-28-765Z-a76e3a60.log`), alongside `crowpanel-128-rotary` passing in CI Run `43891720641`.
+- **Verdict reconciliation (`L158`):** Clarified `6` advisory categories across D1, D2, D3, D5, D6, and D8/D9 noise (`8` advisory rows + `2` info/boundary rows across D1–D10 in Findings).
+
+### Verification Observed
+- `pytest scripts/tests/`: `93` passed.
+- `python3 scripts/doc_lint.py`: exit `0`.
+- `python3 scripts/check_doc_cpp_samples.py`: `49` contracts + `41` samples `PASSED`, `130` `SKIPPED`, `0` `FAILED` across `35` scanned files.
+- `python3 scripts/next_version.py --channel beta --bump major` & `--target 1.0.0`: both output `v1.0.0-beta.1`.
+- Redaction grep & git boundary checks: zero personal user/home paths, personal emails, real SSIDs, raw LAN IPs, or device MACs in `docs/release-audits/v1.0.0-beta.1.md` or `WORKORDER.md`; only those two files modified and `git diff --cached --name-only` is empty.

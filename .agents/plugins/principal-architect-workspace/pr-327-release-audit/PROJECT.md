@@ -51,9 +51,9 @@ work_orders:
   slug: wo3-audit-r1-fixes
   title: Remediate Round 1 audit findings in docs/release-audits/v1.0.0-beta.1.md
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: f9512cf2b4387175ff6e97f112256b78cc857d13
 ---
 
 # PR-327 — chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment
