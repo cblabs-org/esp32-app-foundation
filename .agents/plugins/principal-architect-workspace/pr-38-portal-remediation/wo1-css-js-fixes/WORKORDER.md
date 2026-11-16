@@ -185,7 +185,7 @@ Before reporting back to the PA, you must confirm:
 | **Branch** | `pr-38-wo1-css-js-fixes` |
 | **Commit** | `cc7c587` (changes committed by PA during flash workflow) |
 | **Firmware** | `0.0.12-dev.10` — verified running on device via `system_info` |
-| **Device IP** | `192.168.20.215` |
+| **Device IP** | `<device-ip>` |
 
 ### Summary of Changes
 - **`web/portal/homeassistant.js`** — full rewrite (192→112 lines): removed duplicate event listeners (P2), converted to design system HTML (P1), fixed `--danger`→`--error` (P3), aligned to standard tab lifecycle (P9), replaced inline result divs with `showToast` calls, all API calls via `apiFetch` (P6)

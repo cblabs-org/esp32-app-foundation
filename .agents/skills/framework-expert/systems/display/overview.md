@@ -1,8 +1,8 @@
 # Display Subsystem Overview
 
 The App Foundation uses a decoupled display rendering architecture. Out of the box, it provides two primary display module options:
-1. **[`U8G2DisplayModule`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/U8G2Display/U8G2DisplayModule.hpp)**: Default monochromatic OLED reference implementation.
-2. **[`LVGLDisplayModule`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/LVGLDisplay/LVGLDisplayModule.hpp)**: Optional full-colour TFT implementation using LVGL v9.5 and pluggable hardware adapters (e.g. [`CrowPanel128Adapter`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/adapters/lvgl/CrowPanel128Adapter.hpp)).
+1. **[`U8G2DisplayModule`](../../../../../modules/U8G2Display/U8G2Display.hpp)**: Default monochromatic OLED reference implementation.
+2. **[`LVGLDisplayModule`](../../../../../modules/LVGLDisplay/LVGLDisplay.hpp)**: Optional full-colour TFT implementation using LVGL v9.5 and pluggable hardware adapters (e.g. [`CrowPanel128Adapter`](../../../../../adapters/lvgl/CrowPanel128Adapter.hpp)).
 
 It also explicitly supports headless operation.
 
@@ -12,12 +12,12 @@ It also explicitly supports headless operation.
 The `U8g2DisplayManager` owns the U8G2 instance and orchestrates monochromatic OLED rendering. It manages I2C/SPI bus setup, system status bars, and the `CarouselEngine` for multi-pane content rotation.
 
 ### Colour TFTs & LVGL v9 (`LVGLDisplayModule`)
-The [`LVGLDisplayModule`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/LVGLDisplay/LVGLDisplayModule.hpp) provides full-colour UI support powered by LVGL v9.5 and the LVGL Pro Editor. To keep generic logic separate from panel-specific hardware, it uses the [`ILVGLHardwareAdapter`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/ILVGLHardwareAdapter.hpp) interface pattern:
+The [`LVGLDisplayModule`](../../../../../modules/LVGLDisplay/LVGLDisplay.hpp) provides full-colour UI support powered by LVGL v9.5 and the LVGL Pro Editor. To keep generic logic separate from panel-specific hardware, it uses the [`ILVGLHardwareAdapter`](../../../../../modules/LVGLDisplay/ILVGLHardwareAdapter.hpp) interface pattern:
 - **Generic Module**: Manages LVGL tick loop, SRAM draw buffers, focus groups, web portal tab, MCP tools (`display_status`, `display_control`, `capture_display`), and configuration (`display` namespace).
-- **Hardware Adapter**: Handles hardware initialization (display controller, touch, encoder, keypad, backlight). Ships reference [`CrowPanel128Adapter`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/adapters/lvgl/CrowPanel128Adapter.hpp) for 1.28" circular TFTs.
-- **Design-as-Library Architecture**: UI designs reside in `uidesign/<environment-id>/lvglpro/` and are built as a PlatformIO library via [library.json](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/uidesign/crowpanel-128-rotary/lvglpro/library.json) through `lib_extra_dirs`.
-- **Subject-Driven Contract**: Replaces custom screen shims (`ILVGLSystemScreens` eliminated) with 23 reactive `sys_*` subjects defined in [globals.xml](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/uidesign/crowpanel-128-rotary/lvglpro/globals.xml) for boot progress, system overlays (error, OTA, WiFi setup, busy, message), and diagnostics.
-- **Two-Stage Boot Splash**: Displays a Stage-1 compiled-in boot logo during pre-begin hardware bootstrap, then transitions to LVGL Pro UI via [`ui_init("")`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/uidesign/crowpanel-128-rotary/lvglpro/ui.h).
+- **Hardware Adapter**: Handles hardware initialization (display controller, touch, encoder, keypad, backlight). Ships reference [`CrowPanel128Adapter`](../../../../../adapters/lvgl/CrowPanel128Adapter.hpp) for 1.28" circular TFTs.
+- **Design-as-Library Architecture**: UI designs reside in `uidesign/<environment-id>/lvglpro/` and are built as a PlatformIO library via [library.json](../../../../../uidesign/crowpanel-128-rotary/lvglpro/library.json) through `lib_extra_dirs`.
+- **Subject-Driven Contract**: Replaces custom screen shims (`ILVGLSystemScreens` eliminated) with 23 reactive `sys_*` subjects defined in [globals.xml](../../../../../uidesign/crowpanel-128-rotary/lvglpro/globals.xml) for boot progress, system overlays (error, OTA, WiFi setup, busy, message), and diagnostics.
+- **Two-Stage Boot Splash**: Displays a Stage-1 compiled-in boot logo during pre-begin hardware bootstrap, then transitions to LVGL Pro UI via [`ui_init("")`](../../../../../uidesign/crowpanel-128-rotary/lvglpro/ui.h).
 
 > [!NOTE]
 > `LVGLDisplayModule` targets strictly require **16 MB Flash memory** (`partitions.esp32s3nano.csv`). 4 MB targets are unsupported.
@@ -33,10 +33,10 @@ Display initialization across all display modules follows a two-phase bootstrap 
 
 The display subsystem interacts with modules via several specialized interfaces:
 
-- **[`IDisplayBoard`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/U8G2Display/IDisplayBoard.hpp)**: (U8G2) Allows modules to contribute "boards" (panes/screens) to the `CarouselEngine`.
-- **[`IStatusReporter`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IStatusReporter.hpp)**: Allows display modules to render framework boot progress and system error screens.
-- **[`ILVGLHardwareAdapter`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/ILVGLHardwareAdapter.hpp)**: Decouples hardware initialization from generic LVGL module logic.
-- **[`IU8G2SystemScreens`](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/U8G2Display/IU8G2SystemScreens.hpp)**: Pluggable provider for custom U8G2 system screens.
+- **[`IDisplayBoard`](../../../../../modules/U8G2Display/IDisplayBoard.hpp)**: (U8G2) Allows modules to contribute "boards" (panes/screens) to the `CarouselEngine`.
+- **[`IStatusReporter`](../../../../../include/interfaces/IStatusReporter.hpp)**: Allows display modules to render framework boot progress and system error screens.
+- **[`ILVGLHardwareAdapter`](../../../../../modules/LVGLDisplay/ILVGLHardwareAdapter.hpp)**: Decouples hardware initialization from generic LVGL module logic.
+- **[`IU8G2SystemScreens`](../../../../../modules/U8G2Display/IU8G2SystemScreens.hpp)**: Pluggable provider for custom U8G2 system screens.
 - **Reactive Subjects Contract**: (LVGL) Standardised `sys_*` subjects eliminate screen adapter interfaces by binding firmware state directly to LVGL widgets.
 
 ## CONFIGURING Phase Display Orchestration

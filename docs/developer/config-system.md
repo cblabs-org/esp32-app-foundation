@@ -6,7 +6,7 @@
 
 ---
 
-The ESP32 App Foundation implements a centralized configuration model. Individual modules never read or write directly to flash memory. Instead, they implement the [IConfigurable](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IConfigurable.hpp) interface and register with the [ConfigManager](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/modules/ConfigManager/ConfigManager.hpp), which serves as the centralized gatekeeper for all file I/O operations.
+The ESP32 App Foundation implements a centralized configuration model. Individual modules never read or write directly to flash memory. Instead, they implement the [IConfigurable](../../include/interfaces/IConfigurable.hpp) interface and register with the [ConfigManager](../../modules/ConfigManager/ConfigManager.hpp), which serves as the centralized gatekeeper for all file I/O operations.
 
 For architectural decisions and structure details, see the [Configuration Architecture](../design_specification.md#8-configuration-architecture) section in the Design Specification.
 

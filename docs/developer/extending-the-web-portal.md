@@ -6,7 +6,7 @@
 
 ---
 
-The ESP32 App Foundation features a local Single Page Application (SPA) web portal hosted on the device. Downstream developers can extend the portal nav bar with custom tabs and register REST API endpoints by implementing the [IWebContributor](file:///Users/mcneillm/Documents/Projects/esp32-app-foundation/include/interfaces/IWebContributor.hpp) interface.
+The ESP32 App Foundation features a local Single Page Application (SPA) web portal hosted on the device. Downstream developers can extend the portal nav bar with custom tabs and register REST API endpoints by implementing the [IWebContributor](../../include/interfaces/IWebContributor.hpp) interface.
 
 For a detailed blueprint, see the [Web Portal Architecture](../design_specification.md#10-web-portal-architecture) section in the Design Specification.
 
@@ -527,7 +527,7 @@ The framework's web portal uses JSON Web Tokens (JWT) for API endpoint security.
 
 ### AuthManager
 
-The [AuthManager](../../modules/WebServerManager/AuthManager.hpp) is a core framework service responsible for:
+The [AuthManager](../../modules/AuthManager/AuthManager.hpp) is a core framework service responsible for:
 1. Validating user credentials (defined via `FrameworkConfig` or stored in a secure partition)
 2. Generating JWT tokens upon successful login
 3. Validating incoming JWT tokens on subsequent API requests

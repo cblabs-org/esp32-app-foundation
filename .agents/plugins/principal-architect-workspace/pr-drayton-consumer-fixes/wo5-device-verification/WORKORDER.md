@@ -140,7 +140,7 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 | *(none registered in default sample app)* | N/A | N/A | 0 |
 
 ### Serial Log Anomalies
-None. Clean boot sequence, WiFi connected to `cb-home` (`192.168.86.188`), NTP synchronized, HTTP server started on port 80, steady 30s heartbeats with no crashes, TWDT alerts, or heap exhaustion.
+None. Clean boot sequence, WiFi connected to `<home-ssid>` (`<device-ip>`), NTP synchronized, HTTP server started on port 80, steady 30s heartbeats with no crashes, TWDT alerts, or heap exhaustion.
 
 ### MCP Probe Results
 - `system_info`: Returned valid JSON payload with firmware `0.0.12-dev.55`, chip model `ESP32-S3`, time sync `SYNCED`.

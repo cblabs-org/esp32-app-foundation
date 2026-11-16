@@ -1,0 +1,57 @@
+# gitleaks configuration — ESP32 App Foundation
+#
+# Extends gitleaks' default rule set with the bug-fixer-loop egress-gate
+# patterns (`safe_post.py` BUILTIN_LEAK_PATTERNS + workspace `leak_patterns`),
+# so the same house patterns are enforced on GitHub egress, across git history,
+# and in CI.
+#
+# Usage:
+#   gitleaks detect --config .gitleaks.toml --log-opts="--all"   # full history
+#   gitleaks protect --config .gitleaks.toml --staged             # pre-commit
+
+title = "esp32-app-foundation"
+
+[extend]
+useDefault = true
+
+# Reviewed false positives (see docs/release-audits/v1.0.0-sensitive-content-review.md):
+# - managed_components/: vendored Espressif example/test keys (libsodium,
+#   esp_secure_cert_mgr), tracked briefly in early history, now gitignored.
+# - The PEM upload textarea placeholder in the web portal.
+[allowlist]
+description = "Reviewed vendored fixtures and UI placeholders"
+paths = ['''^managed_components/''']
+regexTarget = "line"
+regexes = ['''placeholder="-----BEGIN PRIVATE KEY''']
+
+# --- bug-fixer egress-gate patterns -----------------------------------------
+
+[[rules]]
+id = "bugfixer-google-oauth-access-token"
+description = "Google OAuth access token (ya29.)"
+regex = '''ya29\.[A-Za-z0-9_-]+'''
+keywords = ["ya29."]
+
+[[rules]]
+id = "bugfixer-aws-access-key-id"
+description = "AWS access key ID"
+regex = '''AKIA[0-9A-Z]{16}'''
+keywords = ["akia"]
+
+[[rules]]
+id = "bugfixer-private-key-block"
+description = "PEM private key block header"
+regex = '''-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'''
+keywords = ["private key"]
+
+[[rules]]
+id = "bugfixer-github-token"
+description = "GitHub token (ghp_/gho_/ghu_/ghs_/ghr_)"
+regex = '''gh[pousr]_[A-Za-z0-9]{36,}'''
+keywords = ["ghp_", "gho_", "ghu_", "ghs_", "ghr_"]
+
+[[rules]]
+id = "bugfixer-github-fine-grained-pat"
+description = "GitHub fine-grained personal access token"
+regex = '''github_pat_[A-Za-z0-9_]{22,}'''
+keywords = ["github_pat_"]

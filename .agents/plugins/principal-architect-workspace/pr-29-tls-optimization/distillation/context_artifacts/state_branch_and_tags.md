@@ -32,7 +32,7 @@ main
 
 - **Board:** ESP32-S3 NanoS3 (Unexpected Maker)
 - **Firmware:** `0.0.10-dev.10` (USB flashed)
-- **IP:** `192.168.20.186`
+- **IP:** `<device-ip>`
 - **Serial port:** `/dev/cu.usbmodem101`
 - **OTA channel:** `dev`
 - **Heap (idle):** ~167 KB free, ~90 KB max_alloc

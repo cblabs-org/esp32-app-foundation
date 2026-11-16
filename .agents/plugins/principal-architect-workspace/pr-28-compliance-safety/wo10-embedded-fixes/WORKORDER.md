@@ -38,7 +38,7 @@ Read `.agents/rules/03-versioning.md` for full details. Summary for this WO:
 
 # Device Info
 
-- IP: `192.168.20.186`
+- IP: `<device-ip>`
 - Board: ESP32-S3 NanoS3
 - PlatformIO env: `esp32dev`
 - The device MCP client skill is at `.agents/skills/device-mcp-client/SKILL.md`
@@ -147,7 +147,7 @@ Read `.agents/rules/03-versioning.md` for full details. Summary for this WO:
 1. **Native build:** Run PlatformIO native build — must compile cleanly.
 2. **ESP32 build:** Run PlatformIO esp32dev build — must compile cleanly.
 3. **Native tests:** Run PlatformIO native tests — all 525+ must pass.
-4. **Flash test:** Flash to the device at 192.168.20.186 and verify via serial
+4. **Flash test:** Flash to the device at <device-ip> and verify via serial
    monitor that the heap report shows, and the stack high-water mark log line
    appears after OTA check.
 

@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "ops": [
+    {
+      "type": "amend",
+      "entry_id": "docseed-0544b3e1",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-0cd5e49f",
+      "dossier_scope": "hardware",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-3d7d7d83",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-3ebd98f8",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-47d2bbb6",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-4ba80f3c",
+      "dossier_scope": "hardware",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-589e2d8f",
+      "dossier_scope": "hardware",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-5f519cbb",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-633c1ecf",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-73bdf14f",
+      "dossier_scope": "house-style-docs",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-83122c1b",
+      "dossier_scope": "hardware",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-83da1df8",
+      "dossier_scope": "hardware",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-88e555a0",
+      "dossier_scope": "scripts",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-9fbba6ff",
+      "dossier_scope": "hardware",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-bb8f8258",
+      "dossier_scope": "hardware",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-c090fe20",
+      "dossier_scope": "root",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-cfcca79f",
+      "dossier_scope": "hardware",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-d4ae1010",
+      "dossier_scope": "hardware",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    },
+    {
+      "type": "amend",
+      "entry_id": "docseed-d774da58",
+      "dossier_scope": "scripts",
+      "timestamp": "2026-11-11T23:11:20.316335Z",
+      "source": "doc-seed",
+      "fields": {
+        "stale_suspect": true
+      }
+    }
+  ],
+  "created_at": "2026-11-11T23:11:20.316335Z",
+  "batch_id": "01M76E2KQWJ4JJ3XB6QD2A9HY0"
+}

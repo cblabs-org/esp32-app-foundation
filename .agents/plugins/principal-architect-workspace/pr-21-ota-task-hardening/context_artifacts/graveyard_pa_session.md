@@ -67,7 +67,7 @@ than committing IDE/build-tool output. Consider removing them from tracking in a
 
 **What happened:** WO1 worker could not live-verify `POST /api/ota status` because the
 device boots in AP-only mode (`esp32-foundation` AP at `192.168.4.1`) when no WiFi
-station credentials are configured. The host machine is on `192.168.86.x` — different
+station credentials are configured. The host machine is on `<home-subnet>` — different
 network — so curl returns `CURLE_COULDNT_CONNECT` (exit code 7).
 
 **Mitigation:** Code inspection was used as a deterministic substitute. The two new fields

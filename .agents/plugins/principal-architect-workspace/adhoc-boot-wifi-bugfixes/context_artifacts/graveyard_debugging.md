@@ -33,9 +33,9 @@ is correct; corruption was only in padding removal.
 
 ## Dead-end 4: 5GHz Band Mismatch
 
-**Hypothesis:** `cb-iot` might be 5GHz-only (ESP32-S3 is 2.4GHz only).
+**Hypothesis:** `<home-ssid>` might be 5GHz-only (ESP32-S3 is 2.4GHz only).
 
-**Ruled out via:** UniFi MCP `get_wlan_configs` — confirmed 2.4GHz WPA2.
+**Ruled out via:** the access point's WLAN configuration — confirmed 2.4GHz WPA2.
 
 ---
 

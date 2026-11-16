@@ -1,5 +1,10 @@
 # lib
 
+## Invariants & contracts
+
+### [docseed-d5798417] Make OTA verification **fail closed** (High — small, localized change in `OtaDownloadEngine` + `otaUpdateManager`).
+`invariant · kind: semantic · anchors: lib/OtaDownloadEngine/OtaDownloadEngine.hpp · source_doc: docs/archive/embedded-best-practices-assessment.md · evidence: doc:docs/archive/embedded-best-practices-assessment.md`
+
 ## Decisions
 
 ### [seed-4c3e5026] Used `#ifndef UNIT_TEST` stubs for native environment, removing the need to add `DeepStackExecutor` to `lib_ignore`.

@@ -35,7 +35,7 @@ re-pushing every tick. Reset in `_onEnterRunning()` for regression recovery.
 
 ## Why hostname, Not the Stored SSID
 
-In AP mode, `getSSID()` returns the *stored STA target SSID* (e.g. "cb-iot"),
+In AP mode, `getSSID()` returns the *stored STA target SSID* (e.g. "<home-ssid>"),
 not the AP being broadcast. The AP name is `currentHostname`
 (e.g. "esp32-foundation"). The wizard shows "Connect to: esp32-foundation /
 visit: http://192.168.4.1" — which is what the user actually needs.

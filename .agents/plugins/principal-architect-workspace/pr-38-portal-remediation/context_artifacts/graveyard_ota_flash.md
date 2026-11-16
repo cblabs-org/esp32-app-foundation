@@ -2,7 +2,7 @@
 
 ## OTA Upload — curl exit 56
 
-**Attempted:** `curl -F "firmware=@firmware.bin" http://192.168.20.215/api/system/ota`
+**Attempted:** `curl -F "firmware=@firmware.bin" http://<device-ip>/api/system/ota`
 
 **Result:** `curl: (56) Recv failure: Connection reset by peer` — transferred ~128KB of 1.4MB before the connection dropped.
 

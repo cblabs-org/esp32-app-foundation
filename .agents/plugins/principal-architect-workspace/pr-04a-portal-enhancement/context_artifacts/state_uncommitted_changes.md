@@ -18,5 +18,5 @@
 
 ## Verified On
 - `esp32dev` environment via `/dev/cu.usbserial-5AA70033491`
-- Device IP: `192.168.20.215`
+- Device IP: `<device-ip>`
 - MCP `system_info` returning all 22 fields confirmed via curl

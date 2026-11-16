@@ -16,8 +16,8 @@ artifacts:
 A serial monitor debugging session on 2026-06-11 found and fixed three bugs on
 `pr-21-ota-task-hardening`. The device was failing WiFi authentication on every
 boot (`AUTH_EXPIRE`) and never showing the WiFi wizard modal in AP mode.
-All three fixes were tested on-device and verified via UniFi — the ESP32 now
-connects to `cb-iot` on first attempt (IP: 192.168.20.186).
+All three fixes were tested on-device and verified via the access point's client list — the ESP32 now
+connects to `<home-ssid>` on first attempt (IP: <device-ip>).
 
 ## What Was Done
 

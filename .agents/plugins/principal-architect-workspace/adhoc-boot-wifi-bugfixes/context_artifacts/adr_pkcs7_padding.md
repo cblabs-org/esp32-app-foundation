@@ -11,7 +11,7 @@ every connection attempt to a known-good WPA2 network.
 
 1. Serial monitor confirmed the device was reaching the AP (auth phase started)
    but being rejected — classic wrong-password symptom.
-2. UniFi MCP confirmed `cb-iot` is 2.4GHz-only WPA2, device MAC never appeared in
+2. The access point's admin interface confirmed `<home-ssid>` is 2.4GHz-only WPA2, device MAC never appeared in
    client history, ruling out band/AP-side issues.
 3. The credential round-trip (save → encrypt → persist → reload → decrypt) *appeared*
    to succeed: no error logs, "Decryption verified" printed.

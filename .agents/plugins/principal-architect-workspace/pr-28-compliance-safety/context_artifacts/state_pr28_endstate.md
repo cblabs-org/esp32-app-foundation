@@ -36,7 +36,7 @@ b415fc9 refactor: upgrade TAG definitions to constexpr and fix 6 mismatched valu
 
 - **Native tests:** 562/562 passing
 - **ESP32 build:** Clean (RAM 16.4%, Flash 80.5%)
-- **Device:** Running `v0.0.10-dev.8` at 192.168.20.186
+- **Device:** Running `v0.0.10-dev.8` at <device-ip>
 
 ## Architecture Review Final Score
 
