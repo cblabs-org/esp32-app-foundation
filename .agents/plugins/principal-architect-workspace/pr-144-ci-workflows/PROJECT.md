@@ -84,15 +84,17 @@ work_orders:
 
 ### Completed Work Orders
 - **`WO-144.1` (`071ad40234836301e5010938bcbfbe63fcbef86c`, `rcpt_c9c1110bea29`, `tree_hash: c9c1110bea29c6e72ae96db20a50e2b5ec20d5cf7d9950c44f1d2073c959fc2a`)** — Added `.gitleaks.toml` (verbatim from `launch/pr-a-sensitive-review`), pinned `pioarduino` `platform-espressif32` `55.03.311` across `platformio.ini`, `sample-app/platformio.ini`, and `template-app/platformio.ini` (plus `QUALITY GATE NOTE` update), configured `test/web/playwright.config.ts` reporter as `[['list'], ['html', { open: 'never' }]]`, hardened `scripts/run_web_tests.py` to fail closed in `CI` unless `SKIP_WEB_TESTS` is truthy (`1`/`true`/`yes`) with pre-step `node --test ble_lifecycle.test.js` and zero-Playwright-test guard, added hermetic pytest suite `scripts/tests/test_run_web_tests.py`, authored `.github/workflows/ci.yml` (`lint-and-secrets`, `web-tests`, `native-tests`, and 6-leg/14-env `firmware-build` matrix + `/tmp/pathb-smoke` submodule consumer build with `submodules: recursive` across all 4 jobs), and added the CI badge to `README.md`.
+- **`WO-144.2` (`5bc585b2c186d5af5ef7df283da58e31591c2a61`, `rcpt_56ea0978196e`, `tree_hash: 56ea0978196e49df214b9e623af523cc11e9cdef5be8ddbd5d527da741b05b78`)** — Pinned `runs-on: ubuntu-24.04` across all 4 CI jobs, pinned `pip install "platformio==6.1.19"` in `native-tests` and `firmware-build`, and bumped `~/.platformio` cache keys (`-pio-native-v2-`, `-pio-fw-v2-`) in `.github/workflows/ci.yml`; added `#include <mutex>` and `#include <vector>` after `#include <atomic>` in `modules/LVGLDisplay/LVGLDisplay.hpp`; added `#ifdef UNIT_TEST` `std::recursive_mutex _unitMutex` + `std::lock_guard` + local `EventCallback`/`ctx` copy before invocation in `modules/EventBus/EventBus.{hpp,cpp}`; reordered `EventBus eventBus;` before `LVGLDisplayModule module{adapter};` in `test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp`; and added `_arduinoMockMillis()` / `setMockMillis()` in `test/stubs/platform/Arduino.h` plus `EventBus` lifetime ordering, `setMockMillis(0)` resets, `_drainTimer` migration, and `getLastFire()` assertion in `test/test_unit/test_homeassistant/test_homeassistant.cpp`.
 
-### Verification Summary (Pre-Step 6A Audit)
-- `pytest scripts/tests/`: `93 passed in 0.29s`
+### Verification Summary (Pre-Step 6A Round 2 Audit — Post-`WO-144.2`)
+- `pytest scripts/tests/`: `93 passed`
 - `python3 scripts/doc_lint.py`: exit `0`
-- `gitleaks detect --config .gitleaks.toml --log-opts="--all" --redact`: `1314 commits scanned`, `no leaks found` (`.gitleaks.toml` identical to `launch/pr-a-sensitive-review`)
-- `CI=true python3 scripts/run_web_tests.py`: `1/1` Node test (`ble_lifecycle.test.js`) + `92 passed` Playwright E2E tests
-- PlatformIO MCP `run_tests` (`native`): `1020 test cases: 1020 succeeded in 00:01:11.635`
-- `python3 scripts/check_doc_cpp_samples.py`: `49` contracts passed, `41` samples passed, `0` failed (`22.76s`)
-- PlatformIO MCP `build_project` (`pioarduino` `55.03.311` zip pin): root `esp32dev` `SUCCESS` (`RAM: 17.8%`, `Flash: 85.6%`) and `sample-app` `esp32dev` `SUCCESS` (`RAM: 17.9%`, `Flash: 94.6%`)
+- `python3 scripts/check_doc_cpp_samples.py`: `49` contracts + `41` samples PASSED, `0` FAILED
+- `gitleaks detect --config .gitleaks.toml --log-opts="--all" --redact`: `1324` commits scanned, `no leaks found`
+- PlatformIO MCP `run_tests` (`native`): `1020/1020` passed
+- PlatformIO MCP `run_tests` (`native_ha`): `1044/1044` passed across all `37/37` suites (including `test_unit/test_homeassistant`)
+- PlatformIO MCP `build_project` (`crowpanel-128-rotary`): `SUCCESS` (`RAM: 19.8%`, `Flash: 45.6%`)
+- Previously verified in `WO-144.1` (Round 1 pre-audit): `CI=true python3 scripts/run_web_tests.py` (`1/1` Node test + `92 passed` Playwright E2E tests) and `build_project` (`esp32dev` root `SUCCESS` / `sample-app` `SUCCESS`).
 
 <!-- pa:graduation-summary start -->
 ### Graduation Summary (`PR-144` / `pr-144-ci-workflows` — `GRADUATED`)
