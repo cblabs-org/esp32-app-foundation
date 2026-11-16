@@ -1,0 +1,66 @@
+---
+schema_version: 1
+wo_id: WO-144.4
+pr_id: PR-144
+title: Fix C++17 ODR multiple definition of mock_mqtt_publish_return_value in native_ha
+complexity: standard
+status: PENDING
+allowed_files:
+- test/stubs/platform/mqtt_client.h
+- test/test_native/test_homeassistant/test_main.cpp
+- test/test_unit/test_homeassistant/test_homeassistant.cpp
+forbidden_files:
+- docs/design_specification.md
+- modules/U8G2Display/
+- modules/U8G2GLDisplay/
+required_skills: []
+verification_command: pytest scripts/tests/ && python3 scripts/doc_lint.py
+max_attempts: 5
+max_structural_failures: 2
+spec_hash: 996d7b06da202b4aa303bf9ce16f69587100e8815cb991c9ac88027a061c8197
+completion: null
+---
+
+# WO-144.4 — Fix C++17 ODR multiple definition of mock_mqtt_publish_return_value in native_ha
+
+## 1. Objective & Scope
+
+Resolve the Linux `GNU ld` C++17 One Definition Rule (ODR) link failure in `native_ha` (`test_native/test_homeassistant` and `test_unit/test_homeassistant`) on Ubuntu 24.04:
+- `test/stubs/platform/mqtt_client.h` (included by `modules/HomeAssistant/HomeAssistant.hpp` and compiled into `libHomeAssistant.a(HomeAssistant.o)`) defines `inline int mock_mqtt_publish_return_value = 0;` inside `#ifndef MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED`.
+- `test/test_native/test_homeassistant/test_main.cpp:8-9` and `test/test_unit/test_homeassistant/test_homeassistant.cpp:8-9` `#define MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED` and emit a non-`inline` strong `.bss` definition `int mock_mqtt_publish_return_value = 0;`.
+- While macOS `ld64` coalesces them, Linux `GNU ld` rejects mixing an ELF COMDAT `inline` definition from `libHomeAssistant.a(HomeAssistant.o)` with the strong `.bss` symbol from the test object file (`multiple definition of 'mock_mqtt_publish_return_value'`).
+- Both test files include `HomeAssistant.hpp` (which includes `<mqtt_client.h>`) inside `#ifdef WITH_HOMEASSISTANT` and never reference `mock_mqtt_publish_return_value` outside `#ifdef WITH_HOMEASSISTANT`, so unifying on the single C++17 `inline` variable definition in `test/stubs/platform/mqtt_client.h` satisfies `-std=c++17` on both Linux `GNU ld` and macOS `ld64`.
+
+Scope is strictly bounded to `test/stubs/platform/mqtt_client.h`, `test/test_native/test_homeassistant/test_main.cpp`, and `test/test_unit/test_homeassistant/test_homeassistant.cpp`.
+
+## 2. Detailed Specification
+
+### 2.1 `test/stubs/platform/mqtt_client.h` (lines 83–85)
+
+- Remove `#ifndef MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED` (line 83) and `#endif` (line 85), leaving the unconditional C++17 `inline` variable definition directly before `esp_mqtt_client_publish(...)`:
+  ```cpp
+  inline int mock_mqtt_publish_return_value = 0;
+  ```
+
+### 2.2 `test/test_native/test_homeassistant/test_main.cpp` (lines 8–9)
+
+- Delete `#define MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED` and `int mock_mqtt_publish_return_value = 0;` (lines 8–9), keeping clean whitespace between the file header comment and `#include <gtest/gtest.h>`.
+
+### 2.3 `test/test_unit/test_homeassistant/test_homeassistant.cpp` (lines 8–9)
+
+- Delete `#define MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED` and `int mock_mqtt_publish_return_value = 0;` (lines 8–9), keeping clean whitespace between the file header comment and `#include <gtest/gtest.h>`.
+- Preserve all `mock_mqtt_publish_return_value` references inside `HomeAssistantBackoffTest` (which resolve directly to the C++17 `inline` variable defined in `test/stubs/platform/mqtt_client.h` via `modules/HomeAssistant/HomeAssistant.hpp`).
+
+## 3. Verification Requirements
+
+1. **Mandatory Gate Command:**
+   - `pytest scripts/tests/ && python3 scripts/doc_lint.py` (must exit `0` with zero failures).
+2. **Boundary & Completion Hygiene:**
+   - Keep all edits strictly inside `allowed_files` (plus Part II of this `WORKORDER.md`).
+   - Keep `completion.verification_summary` strictly `<= 280` characters.
+3. **PlatformIO `native_ha` Verification & Receipt Handoff:**
+   - Coordinator will verify `native_ha` (`1044/1044` across `37/37` suites, including `test_native/test_homeassistant` and `test_unit/test_homeassistant`) via PlatformIO MCP and stamp centrally if skipped by Tier-3 (`ESCALATED_TO_PA`).
+
+## Completion Report
+
+*(Pending execution by Tier-3 Worker.)*

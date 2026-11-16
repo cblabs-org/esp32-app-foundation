@@ -33,7 +33,7 @@ charter:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
   charter_hash: 840481209534f8091141c695fd57a8399150e2fd0f2f4541ae9ca29aa945516d
-status: GRADUATED
+status: APPROVED
 approved_at: '2026-11-15T23:45:43.180039Z'
 github_pr: null
 work_orders:
@@ -60,6 +60,13 @@ work_orders:
   status: COMPLETED
   attempts: 1
   commit_sha: 9a7ecd6e5b41733e6c24c05074a16cd5d69ad4c3
+- id: WO-144.4
+  slug: wo4-native-ha-mqtt-odr-fix
+  title: Fix C++17 ODR multiple definition of mock_mqtt_publish_return_value in native_ha
+  complexity: standard
+  status: PENDING
+  attempts: 0
+  commit_sha: null
 ---
 
 # PR-144 — ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144)
@@ -70,16 +77,18 @@ work_orders:
 
 ## 3. Implementation Plan & Work Order Breakdown
 
-`PR-144` is executed in three bounded Work Orders:
+`PR-144` is executed in four bounded Work Orders:
 - `WO-144.1` (`COMPLETED`) established the initial secret-scan config, platform pins across all three `platformio.ini` manifests, fail-closed web test gate, Playwright list reporter, GitHub Actions workflow, and README badge.
 - `WO-144.2` (`COMPLETED`) resolved the 4 Linux CI failures surfaced by live GitHub Actions run `43824194345`, the `LVGLEventBusIntegrationTest` member destruction-order bug uncovered by `_unitMutex`, and the `native_ha` `test_homeassistant` compilation/lifetime/millis issues under the amended Charter.
-- `WO-144.3` (`PENDING`) adds the missing `test/stubs/platform/portal_assets/` stubs (`homeassistant_js.hpp`, `ble_js.hpp`, `carousel_js.hpp`), pins `lvgl/lvgl@9.5.0` and `lovyan03/LovyanGFX@1.2.26` in `platformio.ini`, and guards `CMD_ROTATE` in `modules/LVGLDisplay/LVGLDisplay.hpp` after live CI run `43836294622`:
+- `WO-144.3` (`COMPLETED`) added the missing `test/stubs/platform/portal_assets/` stubs (`homeassistant_js.hpp`, `ble_js.hpp`, `carousel_js.hpp`), pinned `lvgl/lvgl@9.5.0` and `lovyan03/LovyanGFX@1.2.26` in `platformio.ini`, and guarded `CMD_ROTATE` in `modules/LVGLDisplay/LVGLDisplay.hpp` after live CI run `43836294622`.
+- `WO-144.4` (`PENDING`) fixes the C++17 ODR multiple-definition link error for `mock_mqtt_publish_return_value` on Linux `GNU ld` in `native_ha` (`test_native/test_homeassistant` and `test_unit/test_homeassistant`):
 
 | WO ID | Slug | Title | Complexity | Dependencies |
 | --- | --- | --- | --- | --- |
 | `WO-144.1` | `wo1-ci-and-web-gate` | Add GitHub Actions CI workflows, pin pioarduino platform, and harden run_web_tests.py (#144) | `standard` | Charter locked |
 | `WO-144.2` | `wo2-ci-linux-and-scons-fixes` | Fix Linux CI runner, PlatformIO 6.1.19, LVGLDisplay headers, EventBus tests, and native_ha test_homeassistant | `standard` | `WO-144.1`, Charter amended |
 | `WO-144.3` | `wo3-ci-portal-stubs-and-lvgl-pin` | Add missing native portal asset stubs and pin LVGL 9.5.0 / LovyanGFX 1.2.26 | `standard` | `WO-144.2`, Charter amended |
+| `WO-144.4` | `wo4-native-ha-mqtt-odr-fix` | Fix C++17 ODR multiple definition of mock_mqtt_publish_return_value in native_ha | `standard` | `WO-144.3`, Charter amended |
 
 ### Sequencing & Architectural Notes
 1. **Secret Scanning Configuration (`.gitleaks.toml`) — `WO-144.1`:** Copy `.gitleaks.toml` verbatim from `launch/pr-a-sensitive-review:.gitleaks.toml` so CI enforces both gitleaks defaults and the bug-fixer egress-gate patterns (`bugfixer-*` rules) with the reviewed vendored/UI allowlists.
@@ -92,6 +101,7 @@ work_orders:
 8. **Test Fixture Destruction Order (`test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp`) — `WO-144.2`:** Declare `EventBus eventBus;` before `LVGLDisplayModule module{adapter};` (matching `test_u8g2Display/test_eventbus_integration.cpp:111-112`) so `~LVGLDisplayModule()` unsubscribes while `eventBus` and `_unitMutex` are still valid.
 9. **`native_ha` `Arduino.h` `millis()` Stub & `HomeAssistantBackoffTest` Fixes (`test/stubs/platform/Arduino.h`, `test/test_unit/test_homeassistant/test_homeassistant.cpp`) — `WO-144.2`:** Replace hardcoded `millis()` with `_arduinoMockMillis()` / `setMockMillis()` / `millis()`, declare `EventBus eventBus;` before `HomeAssistantModule ha;` in `HomeAssistantBackoffTest`, reset `setMockMillis(0)` in `SetUp()`/`TearDown()`, migrate `ha._drainStartMs = 1000` to `ha._drainTimer.setInterval(HomeAssistantModule::DRAIN_STALL_TIMEOUT_MS)` + `ha._drainTimer.reset(1000)`, set `setMockMillis(republishTime)` before `ha.republishDiscovery()` in `RepublishAfterDrainDoesNotFalseStall` with `EXPECT_EQ(ha._drainTimer.getLastFire(), republishTime);`, and verify `native_ha` (`37/37`). Note: Tier-3 will skip `pa wo verify` per `PA_WO_VERIFY_DOTFILE_BUG` and escalate cleanly with `completion.verification_summary <= 280` chars.
 10. **Native Portal Asset Stubs & LVGL / LovyanGFX Pin (`test/stubs/platform/portal_assets/`, `platformio.ini`, `modules/LVGLDisplay/LVGLDisplay.hpp`) — `WO-144.3`:** Add `homeassistant_js.hpp`, `ble_js.hpp`, and `carousel_js.hpp` stubs matching `hardware_js.hpp` (`#pragma once`, `<cstddef>`, `<cstdint>`, `inline constexpr`) so clean checkouts without generated `include/portal_assets/` compile `native`/`native_ha`/`check_doc_cpp_samples.py`; pin `lvgl/lvgl@9.5.0` and `lovyan03/LovyanGFX@1.2.26` in root `platformio.ini` `[env:crowpanel-128-rotary]`; and `#undef CMD_ROTATE` after `#include "ui_gen.h"` in `modules/LVGLDisplay/LVGLDisplay.hpp` so LVGL `ft81x` defines cannot collide with LovyanGFX `Panel_M5UnitLCD::CMD_ROTATE`. Note: none of `WO-144.3`'s `allowed_files` are dotfiles, so Tier-3 should run `pa wo verify`.
+11. **`native_ha` C++17 ODR Fix for `mock_mqtt_publish_return_value` (`test/stubs/platform/mqtt_client.h`, `test/test_native/test_homeassistant/test_main.cpp`, `test/test_unit/test_homeassistant/test_homeassistant.cpp`) — `WO-144.4`:** Remove `#ifndef MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED` / `#endif` around `inline int mock_mqtt_publish_return_value = 0;` in `test/stubs/platform/mqtt_client.h` and delete `#define MOCK_MQTT_PUBLISH_RETURN_VALUE_DEFINED` + the non-`inline` `int mock_mqtt_publish_return_value = 0;` definitions from `test/test_native/test_homeassistant/test_main.cpp` and `test/test_unit/test_homeassistant/test_homeassistant.cpp` so Linux `GNU ld` sees only a single C++17 `inline` variable COMDAT symbol across `libHomeAssistant.a(HomeAssistant.o)` and test objects. Coordinator will verify `native_ha` (`1044/1044` across `37/37` suites) via PlatformIO MCP and stamp centrally if skipped by Tier-3 (`ESCALATED_TO_PA`).
 
 ## 4. Outcome & Session Log
 
