@@ -25,6 +25,7 @@ prs:
   - modules/LVGLDisplay/LVGLDisplay.hpp
   - modules/EventBus/EventBus.hpp
   - modules/EventBus/EventBus.cpp
+  - test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp
   required_skills: []
   status: GRADUATED
   github_pr: null

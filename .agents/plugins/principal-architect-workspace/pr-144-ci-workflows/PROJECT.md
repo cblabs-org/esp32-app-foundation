@@ -22,11 +22,12 @@ charter:
   - modules/LVGLDisplay/LVGLDisplay.hpp
   - modules/EventBus/EventBus.hpp
   - modules/EventBus/EventBus.cpp
+  - test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp
   required_skills: []
   verification_floor:
   - pytest scripts/tests/ && python3 scripts/doc_lint.py
   charter_locked: true
-  charter_hash: b42795ec743d88602806ee7e88f7c42d3ffdd09818499d78a65f10a22e8ffbf9
+  charter_hash: 40b25240b17873905045c9e596e496371221f36249ff24d7d49bfe5cc73929d8
 status: APPROVED
 approved_at: '2026-11-15T23:45:43.180039Z'
 github_pr: null
