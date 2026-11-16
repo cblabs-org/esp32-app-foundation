@@ -55,9 +55,9 @@ work_orders:
   slug: wo3-ci-portal-stubs-and-lvgl-pin
   title: Add missing native portal asset stubs and pin LVGL 9.5.0 / LovyanGFX 1.2.26
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: 9a7ecd6e5b41733e6c24c05074a16cd5d69ad4c3
 ---
 
 # PR-144 — ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144)
