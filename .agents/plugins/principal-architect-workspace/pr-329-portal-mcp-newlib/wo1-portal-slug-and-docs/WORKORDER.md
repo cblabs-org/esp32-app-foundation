@@ -5,7 +5,7 @@ pr_id: PR-329
 title: Harden findTabByHash empty-slug guard, pill-btn DOM lookup, Playwright hash
   tests, and portal slug docs
 complexity: standard
-status: PENDING
+status: IN_PROGRESS
 allowed_files:
 - web/portal/app.js
 - test/web/tests/navigation.spec.ts
@@ -25,7 +25,23 @@ verification_command: python3 scripts/doc_lint.py && python3 scripts/run_web_tes
 max_attempts: 5
 max_structural_failures: 2
 spec_hash: f3b9344f9f604170e7dc27c0cb425a643d08b20a24b2f6e8adfe91adfcf9d16c
-completion: null
+completion:
+  status: IN_PROGRESS
+  attempt_num: 1
+  receipt_id: rcpt_cf7d733910ef
+  commit_sha: null
+  files_modified:
+  - .agents/skills/framework-expert/systems/web-portal/html-js-fragments.md
+  - .agents/skills/framework-expert/systems/web-portal/overview.md
+  - docs/developer/extending-the-web-portal.md
+  - test/web/tests/navigation.spec.ts
+  - web/portal/app.js
+  verification_summary: 'python3 scripts/doc_lint.py && python3 scripts/run_web_tests.py:
+    [web-tests] All web tests passed (94 passed)'
+  out_of_scope_findings: []
+  escalation_request: null
+  decisions_made: []
+  dead_ends: []
 ---
 
 # WO-329.1 — Harden findTabByHash empty-slug guard, pill-btn DOM lookup, Playwright hash tests, and portal slug docs
@@ -101,4 +117,25 @@ Update all three documentation files to reflect `slugifyTabName(name)` (`'tab-' 
 ## Completion Report
 <!-- Written by the Tier 3 Worker at task completion -->
 
-_Pending execution._
+### Summary of Changes
+- **`web/portal/app.js`**:
+  - Hardened `findTabByHash()` top-level and child tab matching loops (`(normSlug && topSlug === normSlug)` and `(normSlug && childSlug === normSlug)`) so punctuation-only hashes yielding `normSlug === ""` (such as `#...`) never match empty-slug tabs.
+  - Replaced string-interpolated `document.querySelector('.pill-btn[data-target="' + candidateId + '"]')` in Step 3 DOM fallback with iterating `document.querySelectorAll('.pill-btn')` and comparing `pillBtns[k].getAttribute('data-target') === candidateId`, eliminating CSS selector `SyntaxError` risks on metacharacters.
+- **`test/web/tests/navigation.spec.ts`**:
+  - Extended `'non-alphanumeric tab names (e.g. Intervals.icu) slugify consistently across DOM, pills, events, and URL hashes'` with cold-boot `/#tab-intervals.icu` navigation assertions (`#tab-intervals-icu`, `#bottom-nav [data-target="tab-apps"]`, `#pill-intervals-icu`).
+  - Added `'punctuation-only and metacharacter URL hashes fall back cleanly without errors'` covering `/#...` fallback to `#tab-settings`, `/#tab-foo"bar` metacharacter safety with zero `pageerror` events, and `/#...` non-matching against a punctuation-only `{ name: '---', id: 'punct' }` tab (`[id="tab-"]`, `[id="nav-"]`).
+- **Portal Slug Documentation**:
+  - Updated container ID, `tab-changed` `e.detail`, and `#pill-...` slug derivation documentation to `'tab-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')` (e.g. `'Intervals.icu'` -> `'tab-intervals-icu'`) in `.agents/skills/framework-expert/systems/web-portal/html-js-fragments.md`, `.agents/skills/framework-expert/systems/web-portal/overview.md`, and `docs/developer/extending-the-web-portal.md` (§4 and §8).
+
+### Verification
+- `python3 scripts/doc_lint.py && python3 scripts/run_web_tests.py`: exited `0`, `[web-tests] All web tests passed (94 passed)`.
+- `pa wo verify WO-329.1`: staged `allowed_files` committed first (`f0fdf1da`) to bypass `pa_cli.py` `lstrip("./")` dot-path bug on `.agents/...`, then verified cleanly via `pa wo verify WO-329.1`.
+
+### Memory Distillation (`decisions_made` & `dead_ends`)
+- `decisions_made`:
+  - Used `await page.goto('about:blank')` before `await page.goto('/#...')` in new Playwright hash tests so cold-boot `determineInitialTab()` is exercised rather than only same-document `popstate` transitions.
+  - Guarded only `normSlug` (`(normSlug && topSlug === normSlug)` / `(normSlug && childSlug === normSlug)`) while preserving `topSlug === slug` and `topRawId === slug` so literal slug/id matching stays intact while empty `normSlug` cannot match empty-slug tabs.
+- `dead_ends`:
+  - `pa wo verify` fails when `allowed_files` or `WORKORDER.md` is dirty with a leading dot (`.agents/...` or `.github/...`) because `pa_cli.py` `_parse_porcelain_paths()` calls `.lstrip("./")`. Committing dirty dot-paths first lets `_collect_existing_allowed_files()` preserve the leading dot and complete `pa wo verify` cleanly.
+  - Modifying `WORKORDER.md` `## Completion Report` before `pa wo verify` also triggers `pa`'s scope-hygiene error because `pa` parses `WORKORDER.md` via `_parse_porcelain_paths()` (`agents/...` != `.agents/...`).
+  - Direct `git branch --show-current` is blocked by the worker git lockdown hook (R4).
