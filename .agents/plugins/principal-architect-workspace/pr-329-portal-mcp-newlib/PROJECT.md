@@ -35,7 +35,7 @@ charter:
     && python3 scripts/check_doc_cpp_samples.py && python3 scripts/run_web_tests.py
   charter_locked: true
   charter_hash: 8a4d86cecc1acf4b3eb23c76a62950230468e5a5b0928bbc2d61c391989ddae2
-status: AUDIT_APPROVED
+status: GRADUATED
 approved_at: '2026-11-17T07:23:05.000071Z'
 github_pr: null
 work_orders:
@@ -125,3 +125,16 @@ work_orders:
    - **Static linter & CI:** Add `scripts/check_newlib_printf.py`, `scripts/tests/test_check_newlib_printf.py`, and the `Check Newlib-nano printf format specifiers` step in `.github/workflows/ci.yml` (`lint-and-secrets` right after `Run documentation lint`).
 
 ## 4. Outcome & Session Log
+
+<!-- pa:graduation-summary start -->
+### Graduation Summary (`PR-329` / `pr-329-portal-mcp-newlib` — `GRADUATED`)
+
+- **Completed Date:** 2026-11-17
+- **Graduation Mode:** `builtin`
+- **Latest Audit:** Round 1 — `APPROVED` (`568898515f20`)
+
+| WO-ID | Status | Attempts | Commit SHA |
+|---|---|---|---|
+| WO-329.1 | COMPLETED | 1 | `05463b42efce` |
+| WO-329.2 | COMPLETED | 3 | `6a29a5bfe81b` |
+<!-- pa:graduation-summary end -->

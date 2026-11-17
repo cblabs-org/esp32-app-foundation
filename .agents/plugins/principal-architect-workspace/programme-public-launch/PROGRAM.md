@@ -102,7 +102,7 @@ prs:
   - scripts/tests/test_check_newlib_printf.py
   - .github/workflows/ci.yml
   required_skills: []
-  status: PLANNED
+  status: GRADUATED
   github_pr: null
 ---
 
