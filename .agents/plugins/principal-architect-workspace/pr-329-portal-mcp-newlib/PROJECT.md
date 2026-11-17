@@ -35,10 +35,26 @@ charter:
     && python3 scripts/check_doc_cpp_samples.py && python3 scripts/run_web_tests.py
   charter_locked: true
   charter_hash: 8a4d86cecc1acf4b3eb23c76a62950230468e5a5b0928bbc2d61c391989ddae2
-status: PLANNED
-approved_at: null
+status: APPROVED
+approved_at: '2026-11-17T07:23:05.000071Z'
 github_pr: null
-work_orders: []
+work_orders:
+- id: WO-329.1
+  slug: wo1-portal-slug-and-docs
+  title: Harden findTabByHash empty-slug guard, pill-btn DOM lookup, Playwright hash
+    tests, and portal slug docs
+  complexity: standard
+  status: PENDING
+  attempts: 0
+  commit_sha: null
+- id: WO-329.2
+  slug: wo2-newlib-nano-printf-sweep
+  title: Replace 11 remaining %zu format specifiers, add unit tests, and add check_newlib_printf
+    CI gate
+  complexity: standard
+  status: PENDING
+  attempts: 0
+  commit_sha: null
 ---
 
 # PR-329 — fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs
@@ -90,5 +106,22 @@ work_orders: []
 - PlatformIO native unit tests (`test_unit/test_application`, `test_unit/test_mcpServer`) MUST be run via PlatformIO MCP `run_tests` (never raw `pio` CLI in `verification_command` or shell), followed by `release_lock`.
 
 ## 3. Implementation Plan & Work Order Breakdown
+
+`PR-329` is decomposed into two sequential single-writer Work Orders stacked from `fix/portal-tab-slug-and-mcp-log-format` (base branch `main`, starting from `7984d8d5`):
+
+| WO ID | Slug | Title | Complexity | Dependencies |
+| --- | --- | --- | --- | --- |
+| `WO-329.1` | `wo1-portal-slug-and-docs` | Harden findTabByHash empty-slug guard, pill-btn DOM lookup, Playwright hash tests, and portal slug docs | `standard` | Charter locked |
+| `WO-329.2` | `wo2-newlib-nano-printf-sweep` | Replace 11 remaining %zu format specifiers, add unit tests, and add check_newlib_printf CI gate | `standard` | `WO-329.1` |
+
+### Sequencing & Architectural Notes
+1. **Portal Hash Guard, Selector Hardening, Playwright Coverage, & Slug Docs — `WO-329.1`** (`pr-329-portal-mcp-newlib/wo1-portal-slug-and-docs` from `fix/portal-tab-slug-and-mcp-log-format`):
+   - **`web/portal/app.js`:** In `findTabByHash()`, require `(normSlug && topSlug === normSlug)` and `(normSlug && childSlug === normSlug)` so punctuation-only hashes yielding `normSlug === ""` (such as `#...`) never match empty slugs; in Step 3 DOM fallback, replace string-interpolated `document.querySelector('.pill-btn[data-target="' + candidateId + '"]')` with iterating `document.querySelectorAll('.pill-btn')` and checking `btn.getAttribute('data-target') === candidateId`.
+   - **`test/web/tests/navigation.spec.ts`:** Extend the `non-alphanumeric tab names (e.g. Intervals.icu)` test (and/or add sibling checks) verifying `/#tab-intervals.icu` activates `#tab-intervals-icu` and `#pill-intervals-icu`, and `/#...` falls back cleanly to the default active tab without console/page errors or matching empty-slug tabs.
+   - **Documentation:** Update container ID slug derivation to `'tab-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')` (e.g. `'Intervals.icu'` -> `'tab-intervals-icu'`) in `.agents/skills/framework-expert/systems/web-portal/html-js-fragments.md`, `.agents/skills/framework-expert/systems/web-portal/overview.md`, and `docs/developer/extending-the-web-portal.md`.
+2. **Newlib-Nano `%zu` Sweep, C++ Unit Tests, & Static CI Linter — `WO-329.2`** (`pr-329-portal-mcp-newlib/wo2-newlib-nano-printf-sweep` stacked on `pr-329-portal-mcp-newlib/wo1-portal-slug-and-docs`):
+   - **Firmware `%zu` sweep:** Replace all 11 remaining `%zu` format specifiers across 7 files (`modules/TimeManager/TimeManager.cpp`, `modules/Application/RedactorPreconditionContributor.hpp`, `modules/ConfigManager/JsonPatch.cpp`, `modules/BLEManager/BLEAdvertisingBuilder.cpp`, `modules/WebServer/WebServer.cpp`, `modules/EncoderModule/EncoderModule.cpp`, `lib/MD5Utils/MD5Utils.cpp`) with `%u` + `static_cast<unsigned>(...)`, keeping trailing varargs (`availPrimary`, `availScan`, `saturationCount()`) type-aligned.
+   - **Native unit tests (verified via PlatformIO MCP `run_tests` on `native`):** Add `RedactorPreconditionContributor` healthy (`0/16`, `2/16`) and saturated (`16/16` + `3 rejected`) message formatting tests in `test/test_unit/test_application/test_application.cpp` (clearing `Redactor::instance().clearSecrets()` in setup/teardown), and add a `MCPServer::begin` test with a 2-tool `IMCPContributor` asserting `builtinCount + 2` and callable tool lookup/dispatch in `test/test_unit/test_mcpServer/test_mcpServer.cpp`.
+   - **Static linter & CI:** Add `scripts/check_newlib_printf.py`, `scripts/tests/test_check_newlib_printf.py`, and the `Check Newlib-nano printf format specifiers` step in `.github/workflows/ci.yml` (`lint-and-secrets` right after `Run documentation lint`).
 
 ## 4. Outcome & Session Log
