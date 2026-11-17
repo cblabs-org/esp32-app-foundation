@@ -145,4 +145,38 @@ Replace every `%zu` specifier below with `%u` and `static_cast<unsigned>(...)` (
 ## Completion Report
 <!-- Written by the Tier 3 Worker at task completion -->
 
-_Pending execution._
+### Summary of Changes
+1. **Replaced all 11 remaining `%zu` format specifiers across 7 C++ firmware files with `%u` + `static_cast<unsigned>(...)`:**
+   - `modules/TimeManager/TimeManager.cpp`: L737 (`bodyLen`), L748 (`bodyLen`), and L882–883 (`_dhcpNtpCount` before `%s` `_dhcpNtpServers[0]`, eliminating the Newlib-nano `LoadProhibited` vararg shift).
+   - `modules/Application/RedactorPreconditionContributor.hpp`: L43–45 (saturated message: `secretCount()`, `MAX_SECRETS`, `saturationCount()`) and L47–49 (healthy message: `secretCount()`, `MAX_SECRETS`).
+   - `modules/ConfigManager/JsonPatch.cpp`: L310 (`replace` out-of-range index) and L383 (`test` out-of-range index).
+   - `modules/BLEManager/BLEAdvertisingBuilder.cpp`: L222–223 (`elemSize`, `availPrimary`, `availScan`) and L225–226 (`elemSize`).
+   - `modules/WebServer/WebServer.cpp`: L602–603 (`DEFAULT_MAX_POST_BODY`, `s_bodyLimits.size()`).
+   - `modules/EncoderModule/EncoderModule.cpp`: L45–46 (`MAX_ENCODERS`).
+   - `lib/MD5Utils/MD5Utils.cpp`: L90 (`decodedLen`).
+2. **Added Native C++ GoogleTest Coverage:**
+   - `test/test_unit/test_application/test_application.cpp`: Added `RedactorPreconditionContributorTest` fixture (`SetUp`/`TearDown` clearing `Redactor::instance().clearSecrets()`) with `HealthyFormatting` (`0/16` and `2/16` secrets) and `SaturatedFormatting` (`16/16 secrets, 3 rejected`).
+   - `test/test_unit/test_mcpServer/test_mcpServer.cpp`: Added `McpServerTest.BeginRegistersTwoCustomToolsOnTopOfBuiltins` measuring `builtinCount` dynamically, registering `"custom_tool_one"` and `"custom_tool_two"`, verifying `builtinCount + 2`, lookup via `findTool()`, and JSON-RPC `tools/call` dispatch payloads.
+3. **Added Static Linter, Pytest Suite, & CI Gate:**
+   - `scripts/check_newlib_printf.py`: Zero-dependency Python 3 state-machine C/C++ scanner (`scan_text`, `scan_repo`, `main`) scanning production source roots (skipping missing roots and `test`/`.pio` subdirectories) for `%z*`/`%j*`/`%t*`/`%ll*` inside `"..."` and `R"delim(...)delim"` string literals (allowing escaped `%%`) and `PRI*64`/`PRI*LEAST64`/`PRI*FAST64`/`PRI*MAX` in non-string, non-comment code (allowing `PRIu32`, etc.).
+   - `scripts/tests/test_check_newlib_printf.py`: 50-test pytest suite covering format specifiers, width/precision forms, `PRI*64`/`LEAST64`/`FAST64`/`MAX` vs `PRI*32`, comments, char literals, C++14 digit separators, raw strings, escaped `%%`, `test`/`.pio` exclusions, CLI exit codes, and `scan_repo(REPO_ROOT) == []`.
+   - `.github/workflows/ci.yml`: Added `Check Newlib-nano printf format specifiers` step (`python3 scripts/check_newlib_printf.py`) in `lint-and-secrets` immediately after `Run documentation lint`.
+
+### Verification Results
+- **PlatformIO MCP Native Unit Tests (`run_tests`, `environment: "native"`, followed by `release_lock`):**
+  - `test_unit/test_application`: **54 test cases: 54 succeeded, 0 failed** (3.31s).
+  - `test_unit/test_mcpServer`: **77 test cases: 77 succeeded, 0 failed** (2.83s).
+- **Verification Command (`python3 scripts/check_newlib_printf.py && pytest scripts/tests/ && python3 scripts/doc_lint.py && python3 scripts/check_doc_cpp_samples.py`):** exited `0`:
+  - `check_newlib_printf.py`: `check_newlib_printf: OK (0 violations)`
+  - `pytest scripts/tests/`: `186 passed in 1.26s` (`50 passed` in `scripts/tests/test_check_newlib_printf.py`)
+  - `doc_lint.py`: exited `0`
+  - `check_doc_cpp_samples.py`: `Scanned files: 36`, `Total C++ blocks: 220`, `Contracts verified: 49 PASSED`, `Samples verified: 41 PASSED`, `Skipped blocks: 130 SKIPPED`, `Failed blocks: 0 FAILED`.
+
+### `decisions_made` & `dead_ends`
+- **`decisions_made`:**
+  - Built a character-level C/C++ state-machine scanner in `scripts/check_newlib_printf.py` that replaces comments and string/char literals with spaces while preserving `\n` characters so both string-literal format checks and non-string `PRI*64` checks retain exact 1-based line numbers.
+  - Added C++14 numeric digit-separator handling (`_is_digit_separator`) in `scan_text` so literals like `1'000'000` are not misparsed as character literals while `u8'a'` char literals still parse correctly.
+  - Added `static_cast<unsigned>(...)` to `Redactor::instance().saturationCount()` as well as `secretCount()` and `MAX_SECRETS` in `RedactorPreconditionContributor.hpp` for consistent vararg typing.
+- **`dead_ends`:**
+  - `sample-app/lib` and `template-app/lib` do not currently exist in the repository; `scan_repo` explicitly skips missing roots cleanly without error.
+  - `pa wo verify WO-329.2` was intentionally not invoked by the worker per PA instruction due to `pa_cli.py`'s `lstrip("./")` bug on `.github/workflows/ci.yml`; handoff to Principal Architect for commit + `pa wo verify WO-329.2`.

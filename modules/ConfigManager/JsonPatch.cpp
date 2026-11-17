@@ -307,7 +307,7 @@ JsonPatch::Error JsonPatch::applyOne(JsonObject& doc, JsonObjectConst op,
             size_t idx = static_cast<size_t>(atoi(lastToken));
             JsonArray arr = parent.as<JsonArray>();
             if (idx >= arr.size()) {
-                ESP_LOGW(TAG, "replace — index %zu out of range (size=%d)", idx, (int)arr.size());
+                ESP_LOGW(TAG, "replace — index %u out of range (size=%d)", static_cast<unsigned>(idx), (int)arr.size());
                 return Error::INDEX_OUT_OF_RANGE;
             }
             arr[idx] = op["value"];
@@ -380,7 +380,7 @@ JsonPatch::Error JsonPatch::applyOne(JsonObject& doc, JsonObjectConst op,
             size_t idx = static_cast<size_t>(atoi(lastToken));
             JsonArray arr = parent.as<JsonArray>();
             if (idx >= arr.size()) {
-                ESP_LOGW(TAG, "test — index %zu out of range (size=%d)", idx, (int)arr.size());
+                ESP_LOGW(TAG, "test — index %u out of range (size=%d)", static_cast<unsigned>(idx), (int)arr.size());
                 return Error::INDEX_OUT_OF_RANGE;
             }
             target = arr[idx];

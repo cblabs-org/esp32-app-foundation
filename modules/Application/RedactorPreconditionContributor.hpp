@@ -40,12 +40,14 @@ public:
             },
             [](Cause c, char* buf, size_t len, void*) {
                 if (c == Cause::FallbackEngaged) {
-                    snprintf(buf, len, "Redactor registry saturated (%zu/%zu secrets, %u rejected)",
-                             Redactor::instance().secretCount(), Redactor::MAX_SECRETS,
-                             Redactor::instance().saturationCount());
+                    snprintf(buf, len, "Redactor registry saturated (%u/%u secrets, %u rejected)",
+                             static_cast<unsigned>(Redactor::instance().secretCount()),
+                             static_cast<unsigned>(Redactor::MAX_SECRETS),
+                             static_cast<unsigned>(Redactor::instance().saturationCount()));
                 } else {
-                    snprintf(buf, len, "Redactor healthy (%zu/%zu secrets)",
-                             Redactor::instance().secretCount(), Redactor::MAX_SECRETS);
+                    snprintf(buf, len, "Redactor healthy (%u/%u secrets)",
+                             static_cast<unsigned>(Redactor::instance().secretCount()),
+                             static_cast<unsigned>(Redactor::MAX_SECRETS));
                 }
             });
     }

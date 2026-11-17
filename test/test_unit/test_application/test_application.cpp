@@ -858,6 +858,73 @@ TEST(PreconditionApiTest, PreconditionsRetryHandler) {
 }
 
 // =============================================================================
+// RedactorPreconditionContributor — Newlib-nano safe formatting tests
+// =============================================================================
+
+class RedactorPreconditionContributorTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        Redactor::instance().clearSecrets();
+    }
+    void TearDown() override {
+        Redactor::instance().clearSecrets();
+    }
+};
+
+TEST_F(RedactorPreconditionContributorTest, HealthyFormatting) {
+    PreconditionEngine engine;
+    RedactorPreconditionContributor contributor;
+    contributor.registerPreconditions(engine);
+
+    engine.tick(100);
+    const PreconditionState* st = engine.getStateByName(PreconditionNames::REDACTOR_HEALTH);
+    ASSERT_NE(st, nullptr);
+    EXPECT_TRUE(st->rawStatus.met);
+    EXPECT_EQ(st->rawStatus.cause, Cause::Met);
+
+    char buf[128] = {};
+    st->describe(st->rawStatus.cause, buf, sizeof(buf), st->context);
+    EXPECT_STREQ(buf, "Redactor healthy (0/16 secrets)");
+
+    ASSERT_EQ(Redactor::instance().registerSecret("secret-alpha"), Redactor::RegisterResult::Registered);
+    ASSERT_EQ(Redactor::instance().registerSecret("secret-bravo"), Redactor::RegisterResult::Registered);
+
+    engine.tick(200);
+    st = engine.getStateByName(PreconditionNames::REDACTOR_HEALTH);
+    ASSERT_NE(st, nullptr);
+    EXPECT_TRUE(st->rawStatus.met);
+    EXPECT_EQ(st->rawStatus.cause, Cause::Met);
+
+    st->describe(st->rawStatus.cause, buf, sizeof(buf), st->context);
+    EXPECT_STREQ(buf, "Redactor healthy (2/16 secrets)");
+}
+
+TEST_F(RedactorPreconditionContributorTest, SaturatedFormatting) {
+    PreconditionEngine engine;
+    RedactorPreconditionContributor contributor;
+    contributor.registerPreconditions(engine);
+
+    for (size_t i = 0; i < Redactor::MAX_SECRETS; ++i) {
+        ASSERT_EQ(Redactor::instance().registerSecret("secret-slot-" + std::to_string(i)),
+                  Redactor::RegisterResult::Registered);
+    }
+
+    EXPECT_EQ(Redactor::instance().registerSecret("overflow-one"), Redactor::RegisterResult::Full);
+    EXPECT_EQ(Redactor::instance().registerSecret("overflow-two"), Redactor::RegisterResult::Full);
+    EXPECT_EQ(Redactor::instance().registerSecret("overflow-three"), Redactor::RegisterResult::Full);
+
+    engine.tick(100);
+    const PreconditionState* st = engine.getStateByName(PreconditionNames::REDACTOR_HEALTH);
+    ASSERT_NE(st, nullptr);
+    EXPECT_FALSE(st->rawStatus.met);
+    EXPECT_EQ(st->rawStatus.cause, Cause::FallbackEngaged);
+
+    char buf[128] = {};
+    st->describe(st->rawStatus.cause, buf, sizeof(buf), st->context);
+    EXPECT_STREQ(buf, "Redactor registry saturated (16/16 secrets, 3 rejected)");
+}
+
+// =============================================================================
 // GoogleTest main entry point
 // =============================================================================
 

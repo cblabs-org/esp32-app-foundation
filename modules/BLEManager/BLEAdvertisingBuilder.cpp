@@ -219,11 +219,12 @@ BLEAdvPackResult BLEAdvertisingBuilder::pack(const char* advertisedName,
                 fault.availableBytes = std::max(availPrimary, availScan);
                 result.faults.push_back(fault);
 
-                ESP_LOGE(TAG, "Required advertising element '%s' (%zu B) fits in neither PDU (avail: prim=%u, scan=%u)",
-                         elem.description.c_str(), elemSize, availPrimary, availScan);
+                ESP_LOGE(TAG, "Required advertising element '%s' (%u B) fits in neither PDU (avail: prim=%u, scan=%u)",
+                         elem.description.c_str(), static_cast<unsigned>(elemSize),
+                         static_cast<unsigned>(availPrimary), static_cast<unsigned>(availScan));
             } else {
-                ESP_LOGW(TAG, "Optional advertising element '%s' (%zu B) dropped due to PDU overflow",
-                         elem.description.c_str(), elemSize);
+                ESP_LOGW(TAG, "Optional advertising element '%s' (%u B) dropped due to PDU overflow",
+                         elem.description.c_str(), static_cast<unsigned>(elemSize));
             }
         }
     }
