@@ -43,3 +43,11 @@ Cross-cutting module index: [MODULE_INDEX.md](MODULE_INDEX.md)
 - **Stage 3 (`PR-B` Release Audit) Follow-Up:**
   - `sample-app/platformio.ini` and `template-app/platformio.ini` still specify `board = um_nanos3`, unlike root `platformio.ini` (`board = arduino_nano_esp32`); audit and align during `PR-B`.
 
+## Architectural Invariants (PR-329)
+- **Newlib-Nano Printf Format Contract (`CONFIG_NEWLIB_NANO_FORMAT=y`):**
+  - Root, `sample-app`, and `template-app` all enable `CONFIG_NEWLIB_NANO_FORMAT=y`, where Newlib-nano `vfiprintf` cannot parse `%z*`, `%j*`, `%t*`, `%ll*`, or `PRI*64` and leaves `va_list` unadvanced (causing vararg shifts / `LoadProhibited` crashes when `%s` follows `%zu`).
+  - All production C/C++ sources must format `size_t` via `%u` + `static_cast<unsigned>(...)` (or 32-bit `PRIu32`); enforced statically by `scripts/check_newlib_printf.py` in CI (`lint-and-secrets`).
+- **Portal Tab Slugification (`web/portal/app.js`):**
+  - `slugifyTabName(name)` maps names via `String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')`.
+  - `findTabByHash()` guards `(normSlug && ...)` so punctuation-only hashes yielding `""` never match empty-slug tabs, and iterates `document.querySelectorAll('.pill-btn')` with `getAttribute('data-target') === candidateId` instead of CSS selector string interpolation.
+

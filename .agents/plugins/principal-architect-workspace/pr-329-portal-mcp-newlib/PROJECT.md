@@ -126,6 +126,26 @@ work_orders:
 
 ## 4. Outcome & Session Log
 
+### Completed Work Orders
+- **`WO-329.1` (`1b3a817c6fe1` / base edits `f0fdf1da`, `rcpt_cf7d733910ef`, `tree_hash: cf7d733910ef744e0d9c1f8c44990e5eb4f03feeb25446065215491bfadb95bb`)**:
+  - **`web/portal/app.js`:** Guarded `findTabByHash()` top-level and child loops with `(normSlug && topSlug === normSlug)` and `(normSlug && childSlug === normSlug)` so punctuation-only hashes (`#...`) yielding `normSlug === ""` never match empty-slug tabs; replaced Step 3 CSS selector string interpolation with `document.querySelectorAll('.pill-btn')` + `getAttribute('data-target') === candidateId`.
+  - **`test/web/tests/navigation.spec.ts`:** Extended non-alphanumeric tab test with `/#tab-intervals.icu` cold-boot navigation assertions and added `'punctuation-only and metacharacter URL hashes fall back cleanly without errors'` covering `/#...`, `/#tab-foo"bar`, and empty-slug `{ name: '---', id: 'punct' }` non-matching (`94 passed`).
+  - **Slug Documentation:** Updated container ID / `tab-changed` / `#pill-...` slug derivation to `'tab-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')` (e.g., `'Intervals.icu'` -> `'tab-intervals-icu'`) across `.agents/skills/framework-expert/systems/web-portal/html-js-fragments.md`, `.agents/skills/framework-expert/systems/web-portal/overview.md`, and `docs/developer/extending-the-web-portal.md` (§4 & §8).
+- **`WO-329.2` (`568898515f20` / base edits `6a29a5bf`, `rcpt_88ec3b56ad89`, `tree_hash: 88ec3b56ad89b046521afdd1bccdf0fff09460ba47bbd68851a50f89308450a6`)**:
+  - **Firmware `%zu` Sweep:** Replaced all 11 remaining `%zu` format specifiers across 7 C++ files (`modules/TimeManager/TimeManager.cpp` L737/L748/L882, `modules/Application/RedactorPreconditionContributor.hpp` L43/L47, `modules/ConfigManager/JsonPatch.cpp` L310/L383, `modules/BLEManager/BLEAdvertisingBuilder.cpp` L222/L225, `modules/WebServer/WebServer.cpp` L602, `modules/EncoderModule/EncoderModule.cpp` L45, `lib/MD5Utils/MD5Utils.cpp` L90) with `%u` + `static_cast<unsigned>(...)` and aligned trailing varargs.
+  - **Unit Tests:** Added `RedactorPreconditionContributorTest.HealthyFormatting` & `SaturatedFormatting` in `test/test_unit/test_application/test_application.cpp` (`54/54` passed via PlatformIO MCP `native`) and `McpServerTest.BeginRegistersTwoCustomToolsOnTopOfBuiltins` in `test/test_unit/test_mcpServer/test_mcpServer.cpp` (`77/77` passed via PlatformIO MCP `native`).
+  - **Static Linter & CI:** Added zero-dep `scripts/check_newlib_printf.py`, 50-test `scripts/tests/test_check_newlib_printf.py`, and CI step `Check Newlib-nano printf format specifiers` in `.github/workflows/ci.yml` (`lint-and-secrets`).
+
+### Verification Summary (Cold-Firewall Audit Round 1 & Step 6B Graduation)
+- **Cold-Firewall Audit (`AUDIT-round-1.md`, `021bada9`):** `APPROVED` (`0` blocking, `0` non-blocking) for `568898515f20e60d54e32c3b95daa30da6188138`.
+- **Verification Floor (`pa pr graduate PR-329` -> `2aa4a3de`):**
+  - `python3 scripts/check_newlib_printf.py`: exit `0` (`0 violations`)
+  - `pytest scripts/tests/`: `186 passed` (`50 passed` in `test_check_newlib_printf.py`)
+  - `python3 scripts/doc_lint.py`: exit `0`
+  - `python3 scripts/check_doc_cpp_samples.py`: `49` contracts + `41` samples passed (`0 failed`)
+  - `python3 scripts/run_web_tests.py`: `94 passed`
+- **PlatformIO MCP Native Suites (`native`, lock released):** `test_application` `54/54`, `test_mcpServer` `77/77`, `test_timeManager` `23/23`, `test_bleManager` `65/65`, `test_configManager` `76/76`, `test_webServer` `20/20`, `test_encoderModule` `24/24`, `test_md5Utils` `2/2`.
+
 <!-- pa:graduation-summary start -->
 ### Graduation Summary (`PR-329` / `pr-329-portal-mcp-newlib` — `GRADUATED`)
 
