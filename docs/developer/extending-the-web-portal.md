@@ -330,7 +330,10 @@ Row containers are semantically distinct based on data display vs input interact
 > scoping) apply to your script regardless of how it is delivered.
 
 Immediately after the shell loads your script, it executes it and — on tab
-activation — the script renders its own markup into its container.
+activation — the script renders its own markup into its container (whose ID
+and `tab-changed` `e.detail` value are derived from the tab `name` via
+`'tab-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')`,
+for example `'Intervals.icu'` -> `'tab-intervals-icu'`).
 
 ### The `tab.js` IIFE Pattern
 
@@ -515,9 +518,10 @@ The `WebServerManager` builds this registry dynamically at boot by calling `regi
 ### Nav Resolution logic:
 When the client SPA sees this array, it:
 1. Sorts all entries based on the `order` key.
-2. Group tabs with a `parent` key under the respective parent dropdown/view (e.g., nesting "Status" as a sub-pill under the "System" tab).
-3. Renders top-level entries (no `parent` field) in the bottom-nav bar.
-4. Loads each tab's script (the `script` field, e.g. `/weather.js`) over HTTP and binds click handlers that dispatch the `tab-changed` event so the loaded script renders its container.
+2. Groups tabs with a `parent` key under the respective parent dropdown/view (e.g., nesting "Status" as a sub-pill under the "System" tab).
+3. Derives each tab's DOM container ID (`<div id="tab-...">`), `tab-changed` event `e.detail`, and sub-pill ID (`#pill-...`) from `name` by replacing non-alphanumeric runs with `-` and trimming leading/trailing hyphens: `'tab-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')` (for example, `'Intervals.icu'` -> `'tab-intervals-icu'`).
+4. Renders top-level entries (no `parent` field) in the bottom-nav bar.
+5. Loads each tab's script (the `script` field, e.g. `/weather.js`) over HTTP and binds click handlers that dispatch the `tab-changed` event so the loaded script renders its container.
 
 ---
 

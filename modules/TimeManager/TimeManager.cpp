@@ -734,7 +734,7 @@ void TimeManager::_handlePostZonesUpdate(PsychicRequest* request, PsychicRespons
     }
 
     size_t bodyLen = strlen(body);
-    ESP_LOGI(TAG, "Receiving timezone database update (%zu bytes)", bodyLen);
+    ESP_LOGI(TAG, "Receiving timezone database update (%u bytes)", static_cast<unsigned>(bodyLen));
     File tmp = LittleFS.open("/timezones.tmp", "w");
     if (!tmp) {
         response->send(500, "application/json", "{\"error\":\"Failed to open temp file\"}");
@@ -745,7 +745,7 @@ void TimeManager::_handlePostZonesUpdate(PsychicRequest* request, PsychicRespons
 
     LittleFS.remove("/timezones.json");
     LittleFS.rename("/timezones.tmp", "/timezones.json");
-    ESP_LOGI(TAG, "Timezone database updated (%zu bytes)", bodyLen);
+    ESP_LOGI(TAG, "Timezone database updated (%u bytes)", static_cast<unsigned>(bodyLen));
     response->send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
@@ -879,8 +879,8 @@ void TimeManager::_refreshDhcpNtpStateAndFallback() {
 
     if (changed) {
         if (_dhcpNtpActive) {
-            ESP_LOGI(TAG, "DHCP Option 42 active: %zu server(s) (primary=%s)",
-                     _dhcpNtpCount, _dhcpNtpServers[0]);
+            ESP_LOGI(TAG, "DHCP Option 42 active: %u server(s) (primary=%s)",
+                     static_cast<unsigned>(_dhcpNtpCount), _dhcpNtpServers[0]);
         } else {
             ESP_LOGI(TAG, "DHCP Option 42 cleared; restoring static fallback SNTP servers");
         }

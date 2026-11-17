@@ -87,7 +87,7 @@ std::string MD5Utils::base64ToHex(const std::string& base64Hash) {
     // Allocate decode buffer
     auto* decoded = new (std::nothrow) unsigned char[decodedLen];
     if (decoded == nullptr) {
-        ESP_LOGE(TAG, "base64ToHex: allocation failed (%zu bytes)", decodedLen);
+        ESP_LOGE(TAG, "base64ToHex: allocation failed (%u bytes)", static_cast<unsigned>(decodedLen));
         return std::string();
     }
 

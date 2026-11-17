@@ -494,3 +494,117 @@
 | Project | Scope | Context |
 |---|---|---|
 | [pr-328-release-pipeline](../pr-328-release-pipeline/PROJECT.md) | fix(release): infer split-repo slug from releases_dir and prune sub-floor manifest channels | [PROJECT.md](../pr-328-release-pipeline/PROJECT.md) |
+
+## web/portal/app.js
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## test/web/tests/navigation.spec.ts
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## .agents/skills/framework-expert/systems/web-portal/html-js-fragments.md
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## .agents/skills/framework-expert/systems/web-portal/overview.md
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## docs/developer/extending-the-web-portal.md
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## modules/MCPServer/MCPServer.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## modules/MCPServer/MCPBuiltinTools.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## modules/TimeManager/TimeManager.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## modules/Application/RedactorPreconditionContributor.hpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## modules/ConfigManager/JsonPatch.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## modules/BLEManager/BLEAdvertisingBuilder.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## modules/WebServer/WebServer.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## modules/EncoderModule/EncoderModule.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## lib/MD5Utils/MD5Utils.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## test/test_unit/test_mcpServer/test_mcpServer.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## test/test_unit/test_application/test_application.cpp
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## scripts/check_newlib_printf.py
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## scripts/tests/test_check_newlib_printf.py
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |
+
+## .github/workflows/ci.yml
+
+| Project | Scope | Context |
+|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs | [PROJECT.md](../pr-329-portal-mcp-newlib/PROJECT.md) |

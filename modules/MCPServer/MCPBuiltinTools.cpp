@@ -519,5 +519,5 @@ void mcpBuiltinTools::registerAll(MCPToolRegistry& registry,
         &s_builtinCtx
     );
 
-    ESP_LOGI(TAG, "Registered %zu built-in tools", registry.size());
+    ESP_LOGI(TAG, "Registered %u built-in tools", static_cast<unsigned>(registry.size()));
 }

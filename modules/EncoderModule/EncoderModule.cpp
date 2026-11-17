@@ -42,8 +42,8 @@ EncoderModule::~EncoderModule() {
 
 void EncoderModule::addEncoder(const BoardEncoder& encoder) {
     if (_encoderCount >= MAX_ENCODERS) {
-        ESP_LOGE(TAG, "Cannot add encoder '%s': MAX_ENCODERS (%zu) reached",
-                 encoder.id ? encoder.id : "?", MAX_ENCODERS);
+        ESP_LOGE(TAG, "Cannot add encoder '%s': MAX_ENCODERS (%u) reached",
+                 encoder.id ? encoder.id : "?", static_cast<unsigned>(MAX_ENCODERS));
         return;
     }
     if (encoder.stepsPerDetent == 0) {

@@ -51,6 +51,9 @@ jobs:
       - name: Run documentation lint
         run: python3 scripts/doc_lint.py
 
+      - name: Check Newlib-nano printf format specifiers
+        run: python3 scripts/check_newlib_printf.py
+
       - name: Run Python script unit tests
         run: pytest scripts/tests/
 

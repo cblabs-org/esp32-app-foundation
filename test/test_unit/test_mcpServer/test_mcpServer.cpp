@@ -1002,6 +1002,74 @@ TEST(McpBuiltinToolsTest, SystemInfoIncludesDhcpTimeFields) {
     lwip_dhcp_tz_take_pending(nullptr, 0, nullptr, nullptr, 0, nullptr);
 }
 
+/** MCPServer::begin must register contributor tools on top of all built-in tools. */
+TEST(McpServerTest, BeginRegistersTwoCustomToolsOnTopOfBuiltins) {
+    MCPServer baselineServer;
+    std::vector<IMCPContributor*> emptyContributors;
+    baselineServer.begin(emptyContributors, nullptr);
+    const size_t builtinCount = baselineServer.getRegistry().size();
+
+    class TwoToolContributor : public IMCPContributor {
+    public:
+        void registerMCPTools(MCPToolRegistry& registry) override {
+            registry.addTool("custom_tool_one", "First custom test tool",
+                [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
+                    (void)params;
+                    result["tool"] = "one";
+                    result["ok"] = true;
+                }
+            );
+            registry.addTool("custom_tool_two", "Second custom test tool",
+                [](void* /*ctx*/, JsonObject& params, JsonObject& result) {
+                    (void)params;
+                    result["tool"] = "two";
+                    result["count"] = 2;
+                }
+            );
+        }
+    };
+
+    TwoToolContributor contributor;
+    std::vector<IMCPContributor*> contributors = { &contributor };
+
+    MCPServer server;
+    server.begin(contributors, nullptr);
+
+    EXPECT_EQ(server.getRegistry().size(), builtinCount + 2u);
+    EXPECT_NE(server.getRegistry().findTool("custom_tool_one"), nullptr);
+    EXPECT_NE(server.getRegistry().findTool("custom_tool_two"), nullptr);
+
+    {
+        std::string response = processAndCapture(server,
+            R"({"jsonrpc":"2.0","id":101,"method":"tools/call","params":{"name":"custom_tool_one"}})");
+        JsonDocument doc;
+        ASSERT_FALSE(deserializeJson(doc, response));
+        EXPECT_EQ(doc["id"].as<int>(), 101);
+        EXPECT_FALSE(doc["result"]["isError"].as<bool>());
+        const char* innerText = doc["result"]["content"][0]["text"].as<const char*>();
+        ASSERT_NE(innerText, nullptr);
+        JsonDocument inner;
+        ASSERT_FALSE(deserializeJson(inner, innerText));
+        EXPECT_STREQ(inner["tool"].as<const char*>(), "one");
+        EXPECT_TRUE(inner["ok"].as<bool>());
+    }
+
+    {
+        std::string response = processAndCapture(server,
+            R"({"jsonrpc":"2.0","id":102,"method":"tools/call","params":{"name":"custom_tool_two"}})");
+        JsonDocument doc;
+        ASSERT_FALSE(deserializeJson(doc, response));
+        EXPECT_EQ(doc["id"].as<int>(), 102);
+        EXPECT_FALSE(doc["result"]["isError"].as<bool>());
+        const char* innerText = doc["result"]["content"][0]["text"].as<const char*>();
+        ASSERT_NE(innerText, nullptr);
+        JsonDocument inner;
+        ASSERT_FALSE(deserializeJson(inner, innerText));
+        EXPECT_STREQ(inner["tool"].as<const char*>(), "two");
+        EXPECT_EQ(inner["count"].as<int>(), 2);
+    }
+}
+
 // =============================================================================
 // GoogleTest main entry point
 // =============================================================================

@@ -599,8 +599,8 @@ void WebServerManager::begin(const std::vector<IWebContributor*>& contributors,
         }
         return next();
     });
-    ESP_LOGI(TAG, "Global body-size middleware registered (default=%u, %zu overrides)",
-             (unsigned)DEFAULT_MAX_POST_BODY, (size_t)s_bodyLimits.size());
+    ESP_LOGI(TAG, "Global body-size middleware registered (default=%u, %u overrides)",
+             (unsigned)DEFAULT_MAX_POST_BODY, static_cast<unsigned>(s_bodyLimits.size()));
 
     ESP_LOGI(TAG, "WebServer configured (TLS=%d, AP=%d), registered %u contributors",
              useTls, apMode, (unsigned)contributors.size());

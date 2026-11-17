@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-11-16 -->
+<!-- Last updated: 2026-11-17 -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -19,11 +19,11 @@
 ## Recently Completed (last 5)
 | Project | Completed | Modules | Key Outcome |
 |---|---|---|---|
+| [pr-329-portal-mcp-newlib](../pr-329-portal-mcp-newlib/PROJECT.md) | 2026-11-17 | web/portal/app.js, test/web/tests/navigation.spec.ts, .agents/skills/framework-expert/systems/web-portal/html-js-fragments.md, .agents/skills/framework-expert/systems/web-portal/overview.md, docs/developer/extending-the-web-portal.md, modules/MCPServer/MCPServer.cpp, modules/MCPServer/MCPBuiltinTools.cpp, modules/TimeManager/TimeManager.cpp, modules/Application/RedactorPreconditionContributor.hpp, modules/ConfigManager/JsonPatch.cpp, modules/BLEManager/BLEAdvertisingBuilder.cpp, modules/WebServer/WebServer.cpp, modules/EncoderModule/EncoderModule.cpp, lib/MD5Utils/MD5Utils.cpp, test/test_unit/test_mcpServer/test_mcpServer.cpp, test/test_unit/test_application/test_application.cpp, scripts/check_newlib_printf.py, scripts/tests/test_check_newlib_printf.py, .github/workflows/ci.yml | fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs |
 | [pr-328-release-pipeline](../pr-328-release-pipeline/PROJECT.md) | 2026-11-16 | scripts/deploy_release.py, scripts/test_ota_pagination.py, scripts/tests/test_deploy_release.py, releases/README.md | fix(release): infer split-repo slug from releases_dir and prune sub-floor manifest channels |
 | [pr-327-release-audit](../pr-327-release-audit/PROJECT.md) | 2026-11-16 | lib/DeviceCrypto/DeviceCrypto.cpp, lib/OTACerts/OTACerts.h, modules/OTAUpdateManager/OTAUpdateManager.cpp, modules/OTAUpdateManager/web/ota.js, docs/developer/ota-update-system.md, docs/codemender_findings.json, docs/release-audits/, CHANGELOG.md, sample-app/platformio.ini, template-app/platformio.ini, test/stubs/platform/mbedtls/aes.h, test/stubs/platform/mbedtls/base64.h, test/test_unit/test_deviceCrypto/test_deviceCrypto.cpp | chore(release): v1.0.0-beta.1 release audit, PKCS#7 padding fix, and esp32s3nano alignment |
 | [pr-144-ci-workflows](../pr-144-ci-workflows/PROJECT.md) | 2026-11-15 | .gitleaks.toml, .github/workflows/, README.md, platformio.ini, sample-app/platformio.ini, template-app/platformio.ini, scripts/run_web_tests.py, scripts/check_doc_cpp_samples.py, scripts/tests/, test/web/playwright.config.ts, modules/LVGLDisplay/LVGLDisplay.hpp, modules/EventBus/EventBus.hpp, modules/EventBus/EventBus.cpp, test/test_unit/test_lvglDisplay/test_eventbus_integration.cpp, test/stubs/platform/Arduino.h, test/test_unit/test_homeassistant/test_homeassistant.cpp, test/stubs/platform/portal_assets/, test/stubs/platform/mqtt_client.h, test/test_native/test_homeassistant/test_main.cpp | ci: GitHub Actions quality gates and fail-closed web test runner (Resolves #144) |
 | [pr-320-dhcp-ntp-timezone](../pr-320-dhcp-ntp-timezone/PROJECT.md) | 2026-11-14 | .gitignore, .memory/.gitignore, CMakeLists.txt, platformio.ini, sdkconfig.defaults, include/lwip_dhcp_tz_hooks.h, src/main.cpp, sample-app/CMakeLists.txt, sample-app/sdkconfig.defaults, sample-app/src/main.cpp, template-app/CMakeLists.txt, template-app/sdkconfig.defaults, template-app/src/main.cpp, modules/TimeManager/**, modules/MCPServer/**, test/stubs/**, test/test_unit/test_timeManager/**, test/test_unit/test_mcpServer/**, test/web/**, docs/developer/**, .agents/skills/framework-expert/** | feat(time): DHCP NTP (RFC 2132 opt 42) and DHCP Timezone (RFC 4833 opts 100/101) |
-| pr-225-ble-manager | 2026-09-25 | BLEManager, BLEStack, BLESerialization, DeviceInfoServiceProvider, WifiManager, web/portal | Full BLE module: dual-role NimBLE (peripheral DIS + central), MCP tools, portal tab, WiFi coexistence hardening, radio tuning (+20 dBm TX, deferred conn params, no modem sleep). 11 WOs, 82 dev tags, 15-min soak validated. PR [#235](https://github.com/matthewmcneill/esp32-app-foundation/pull/235) merged. [PROJECT.md](../pr-225-ble-manager/PROJECT.md) |
 
 ## Older Projects
 97 completed projects.
@@ -42,4 +42,12 @@ Cross-cutting module index: [MODULE_INDEX.md](MODULE_INDEX.md)
   - `[env:esp32s3nano]` in `platformio.ini` MUST keep `board_upload.arduino.flash_extra_images =` (inherited by `[env:esp32s3nano_ble]`) to suppress the broken Tasmota-prefixed `nora_recovery.ino.bin` merge path in `espressif32` hybrid `arduino, espidf` builds.
 - **Stage 3 (`PR-B` Release Audit) Follow-Up:**
   - `sample-app/platformio.ini` and `template-app/platformio.ini` still specify `board = um_nanos3`, unlike root `platformio.ini` (`board = arduino_nano_esp32`); audit and align during `PR-B`.
+
+## Architectural Invariants (PR-329)
+- **Newlib-Nano Printf Format Contract (`CONFIG_NEWLIB_NANO_FORMAT=y`):**
+  - Root, `sample-app`, and `template-app` all enable `CONFIG_NEWLIB_NANO_FORMAT=y`, where Newlib-nano `vfiprintf` cannot parse `%z*`, `%j*`, `%t*`, `%ll*`, or `PRI*64` and leaves `va_list` unadvanced (causing vararg shifts / `LoadProhibited` crashes when `%s` follows `%zu`).
+  - All production C/C++ sources must format `size_t` via `%u` + `static_cast<unsigned>(...)` (or 32-bit `PRIu32`); enforced statically by `scripts/check_newlib_printf.py` in CI (`lint-and-secrets`).
+- **Portal Tab Slugification (`web/portal/app.js`):**
+  - `slugifyTabName(name)` maps names via `String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')`.
+  - `findTabByHash()` guards `(normSlug && ...)` so punctuation-only hashes yielding `""` never match empty-slug tabs, and iterates `document.querySelectorAll('.pill-btn')` with `getAttribute('data-target') === candidateId` instead of CSS selector string interpolation.
 

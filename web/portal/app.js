@@ -315,6 +315,17 @@ document.addEventListener('DOMContentLoaded', function() {
   // =========================================================================
 
   /**
+   * @brief Convert a human-readable tab or pill name into a URL/DOM-safe slug.
+   *        Replaces any non-alphanumeric run (spaces, dots, slashes, etc.) with
+   *        a single hyphen and trims leading/trailing hyphens (e.g. 'Intervals.icu' -> 'intervals-icu').
+   * @param {string} name
+   * @returns {string}
+   */
+  function slugifyTabName(name) {
+    return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  }
+
+  /**
    * @brief Inject app-contributed top-level tabs into the bottom nav.
    *        Framework tabs (WiFi, System) are already in the HTML.
    */
@@ -333,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     for (var i = 0; i < topLevelTabs.length; i++) {
       var tab = topLevelTabs[i];
-      var tabId = 'tab-' + tab.name.toLowerCase().replace(/\s+/g, '-');
+      var tabId = 'tab-' + slugifyTabName(tab.name);
 
       // Skip WiFi, System, and Security — they're already hardcoded in HTML
       if (tabId === 'tab-wifi' || tabId === 'tab-system' || tabId === 'tab-security' || tabId === 'tab-credits') continue;
@@ -396,7 +407,7 @@ document.addEventListener('DOMContentLoaded', function() {
     for (var p in childTabs) {
       for (var j = 0; j < childTabs[p].length; j++) {
         var child = childTabs[p][j];
-        var childId = 'tab-' + child.name.toLowerCase().replace(/\s+/g, '-');
+        var childId = 'tab-' + slugifyTabName(child.name);
         if (!document.getElementById(childId)) {
           var cdiv = document.createElement('div');
           cdiv.id = childId;
@@ -451,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // Activate the stored sub-pill (or first child)
       var storedPill = activeSubPill[parentName];
-      var firstChildId = 'tab-' + children[0].name.toLowerCase().replace(/\s+/g, '-');
+      var firstChildId = 'tab-' + slugifyTabName(children[0].name);
       activateSubPill(storedPill || firstChildId, parentName, isInit);
     } else {
       // No children — hide pill bar and show the tab directly
@@ -473,7 +484,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Look up in tabHierarchy for proper case
     for (var i = 0; i < tabHierarchy.length; i++) {
       var name = tabHierarchy[i].name;
-      if (name.toLowerCase().replace(/\s+/g, '-') === raw) {
+      if (slugifyTabName(name) === raw) {
         return name;
       }
     }
@@ -492,7 +503,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     for (var i = 0; i < children.length; i++) {
       var child = children[i];
-      var childId = 'tab-' + child.name.toLowerCase().replace(/\s+/g, '-');
+      var childId = 'tab-' + slugifyTabName(child.name);
 
       var btn = document.createElement('button');
       btn.id = 'pill-' + childId.replace('tab-', '');
@@ -572,14 +583,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!clean) return null;
     var candidateId = clean.indexOf('tab-') === 0 ? clean : 'tab-' + clean;
     var slug = clean.indexOf('tab-') === 0 ? clean.slice(4) : clean;
+    var normSlug = slugifyTabName(slug);
 
     // 1. Check top-level tabs
     for (var i = 0; i < topLevelTabs.length; i++) {
       var topTab = topLevelTabs[i];
-      var topId = 'tab-' + topTab.name.toLowerCase().replace(/\s+/g, '-');
-      var topSlug = topTab.name.toLowerCase().replace(/\s+/g, '-');
+      var topSlug = slugifyTabName(topTab.name);
+      var topId = 'tab-' + topSlug;
       var topRawId = topTab.id ? topTab.id.toLowerCase() : '';
-      if (topId === candidateId || topSlug === slug || topRawId === slug || ('tab-' + topRawId) === candidateId) {
+      if (topId === candidateId || topSlug === slug || (normSlug && topSlug === normSlug) || topRawId === slug || ('tab-' + topRawId) === candidateId) {
         return { topTabId: topId, subPillId: null };
       }
     }
@@ -589,11 +601,11 @@ document.addEventListener('DOMContentLoaded', function() {
       var children = childTabs[parent];
       for (var j = 0; j < children.length; j++) {
         var child = children[j];
-        var childId = 'tab-' + child.name.toLowerCase().replace(/\s+/g, '-');
-        var childSlug = child.name.toLowerCase().replace(/\s+/g, '-');
+        var childSlug = slugifyTabName(child.name);
+        var childId = 'tab-' + childSlug;
         var childRawId = child.id ? child.id.toLowerCase() : '';
-        if (childId === candidateId || childSlug === slug || childRawId === slug || ('tab-' + childRawId) === candidateId) {
-          var parentTopId = 'tab-' + parent.toLowerCase().replace(/\s+/g, '-');
+        if (childId === candidateId || childSlug === slug || (normSlug && childSlug === normSlug) || childRawId === slug || ('tab-' + childRawId) === candidateId) {
+          var parentTopId = 'tab-' + slugifyTabName(parent);
           return { topTabId: parentTopId, subPillId: childId, parentName: parent };
         }
       }
@@ -602,10 +614,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // 3. Check DOM elements directly in case an injected or hardcoded tab doesn't match topLevelTabs
     var targetEl = document.getElementById(candidateId);
     if (targetEl && targetEl.classList.contains('tab-content')) {
-      var pillBtn = document.querySelector('.pill-btn[data-target="' + candidateId + '"]');
+      var pillBtn = null;
+      var pillBtns = document.querySelectorAll('.pill-btn');
+      for (var k = 0; k < pillBtns.length; k++) {
+        if (pillBtns[k].getAttribute('data-target') === candidateId) {
+          pillBtn = pillBtns[k];
+          break;
+        }
+      }
       if (pillBtn) {
         var pName = pillBtn.getAttribute('data-parent');
-        return { topTabId: 'tab-' + pName.toLowerCase().replace(/\s+/g, '-'), subPillId: candidateId, parentName: pName };
+        return { topTabId: 'tab-' + slugifyTabName(pName), subPillId: candidateId, parentName: pName };
       }
       return { topTabId: candidateId, subPillId: null };
     }
@@ -640,7 +659,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 3. STA mode default: lowest-order non-framework top-level tab
     for (var i = 0; i < topLevelTabs.length; i++) {
       var tab = topLevelTabs[i];
-      var tabId = 'tab-' + tab.name.toLowerCase().replace(/\s+/g, '-');
+      var tabId = 'tab-' + slugifyTabName(tab.name);
       if (FRAMEWORK_TABS.indexOf(tabId) === -1) {
         return tabId;
       }

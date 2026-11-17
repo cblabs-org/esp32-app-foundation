@@ -59,6 +59,7 @@ void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigM
     // These are always available regardless of which app uses the framework.
     _registryPtr = &_registry;
     mcpBuiltinTools::registerAll(_registry, configManager, timeManager, dataManager);
+    const size_t builtinCount = _registry.size();
 
     // --- Step 2: Collect tools from all contributors ---
     for (auto* contributor : contributors) {
@@ -67,8 +68,9 @@ void MCPServer::begin(const std::vector<IMCPContributor*>& contributors, ConfigM
         }
     }
 
-    ESP_LOGI(TAG, "MCP Server started with %zu tools (%zu built-in)",
-             _registry.size(), _registry.size() - 0);
+    ESP_LOGI(TAG, "MCP Server started with %u tools (%u built-in)",
+             static_cast<unsigned>(_registry.size()),
+             static_cast<unsigned>(builtinCount));
 
     // --- Step 3: Mark initialised ---
     _initialized = true;
