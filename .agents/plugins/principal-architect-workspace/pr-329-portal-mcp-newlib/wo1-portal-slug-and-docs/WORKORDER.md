@@ -5,7 +5,7 @@ pr_id: PR-329
 title: Harden findTabByHash empty-slug guard, pill-btn DOM lookup, Playwright hash
   tests, and portal slug docs
 complexity: standard
-status: IN_PROGRESS
+status: COMPLETED
 allowed_files:
 - web/portal/app.js
 - test/web/tests/navigation.spec.ts
@@ -26,10 +26,10 @@ max_attempts: 5
 max_structural_failures: 2
 spec_hash: f3b9344f9f604170e7dc27c0cb425a643d08b20a24b2f6e8adfe91adfcf9d16c
 completion:
-  status: IN_PROGRESS
+  status: COMPLETED
   attempt_num: 1
   receipt_id: rcpt_cf7d733910ef
-  commit_sha: null
+  commit_sha: 05463b42efce7a6f1b17abee44da2947e6f7621e
   files_modified:
   - .agents/skills/framework-expert/systems/web-portal/html-js-fragments.md
   - .agents/skills/framework-expert/systems/web-portal/overview.md

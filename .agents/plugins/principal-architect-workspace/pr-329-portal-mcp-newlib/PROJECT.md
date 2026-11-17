@@ -44,9 +44,9 @@ work_orders:
   title: Harden findTabByHash empty-slug guard, pill-btn DOM lookup, Playwright hash
     tests, and portal slug docs
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 1
+  commit_sha: 05463b42efce7a6f1b17abee44da2947e6f7621e
 - id: WO-329.2
   slug: wo2-newlib-nano-printf-sweep
   title: Replace 11 remaining %zu format specifiers, add unit tests, and add check_newlib_printf
