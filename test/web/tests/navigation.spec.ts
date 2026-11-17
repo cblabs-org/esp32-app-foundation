@@ -406,5 +406,54 @@ test.describe('Tab Navigation', () => {
     await expect(page.locator('#tab-intervals-icu')).toHaveClass(/tab-content--active/);
     await expect(page.locator('#bottom-nav [data-target="tab-apps"]')).toHaveClass(/tab-link--active/);
     await expect(page.locator('#pill-intervals-icu')).toHaveClass(/pill-btn--active/);
+
+    // Direct cold-boot URL hash navigation via /#tab-intervals.icu
+    await page.goto('about:blank');
+    await page.goto('/#tab-intervals.icu');
+    await page.waitForFunction(() => (window as any).apiFetch !== undefined);
+    await expect(page.locator('body')).toHaveClass(/portal-ready/);
+    await expect(page.locator('#tab-intervals-icu')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#bottom-nav [data-target="tab-apps"]')).toHaveClass(/tab-link--active/);
+    await expect(page.locator('#pill-intervals-icu')).toHaveClass(/pill-btn--active/);
+  });
+
+  test('punctuation-only and metacharacter URL hashes fall back cleanly without errors', async ({ page }) => {
+    const pageErrors: Error[] = [];
+    page.on('pageerror', err => pageErrors.push(err));
+
+    // Punctuation-only hash /#... falls back to default STA tab (#tab-settings)
+    await page.goto('about:blank');
+    await page.goto('/#...');
+    await page.waitForFunction(() => (window as any).apiFetch !== undefined);
+    await expect(page.locator('body')).toHaveClass(/portal-ready/);
+    await expect(page.locator('#tab-settings')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#bottom-nav [data-target="tab-display"]')).toHaveClass(/tab-link--active/);
+
+    // Quote/metacharacter hash /#tab-foo"bar throws zero page errors and falls back cleanly
+    await page.goto('about:blank');
+    await page.goto('/#tab-foo"bar');
+    await page.waitForFunction(() => (window as any).apiFetch !== undefined);
+    await expect(page.locator('body')).toHaveClass(/portal-ready/);
+    await expect(page.locator('#tab-settings')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('#bottom-nav [data-target="tab-display"]')).toHaveClass(/tab-link--active/);
+
+    // Even when a punctuation-only tab produces an empty slug, /#... must not match #tab- / #nav-
+    const tabsWithEmptySlug = [
+      ...MOCK_TABS,
+      { name: 'Apps',          id: 'Apps',          parent: null,   order: 50 },
+      { name: 'Intervals.icu', id: 'Intervals.icu', parent: 'Apps', order: 20 },
+      { name: '---',           id: 'punct',         parent: null,   order: 60 },
+    ];
+    await page.route('**/api/tabs', route => route.fulfill({ json: tabsWithEmptySlug }));
+
+    await page.goto('about:blank');
+    await page.goto('/#...');
+    await page.waitForFunction(() => (window as any).apiFetch !== undefined);
+    await expect(page.locator('body')).toHaveClass(/portal-ready/);
+    await expect(page.locator('#tab-settings')).toHaveClass(/tab-content--active/);
+    await expect(page.locator('[id="tab-"]')).not.toHaveClass(/tab-content--active/);
+    await expect(page.locator('[id="nav-"]')).not.toHaveClass(/tab-link--active/);
+
+    expect(pageErrors).toEqual([]);
   });
 });

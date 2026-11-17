@@ -76,7 +76,7 @@ The remaining conventions below (the `tab-changed` contract, IIFE wrapper, ID sc
 
 The frontend framework (`app.js`) creates a container `div` for each tab inside the DOM, and dispatches a `tab-changed` event whenever the active tab changes. Tab scripts must listen to this event to render their UI and bind event listeners.
 
-* **Target Container ID**: Derives from the tab display name: `'tab-' + name.toLowerCase().replace(/\s+/g, '-')`.
+* **Target Container ID**: Derives from the tab display name by replacing non-alphanumeric runs with `-` and trimming leading/trailing hyphens: `'tab-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')` (for example, `'Intervals.icu'` becomes `'tab-intervals-icu'`).
 * **Event Listener**: The script must filter events by checking `e.detail` against its target container ID.
 * **Initialization Guard**: Use an initialization flag to ensure the HTML skeleton is only injected once.
 

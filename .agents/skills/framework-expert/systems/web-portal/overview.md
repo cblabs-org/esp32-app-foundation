@@ -74,7 +74,7 @@ The web portal boots via the following sequential steps:
 4. **Sequential Loading**: `app.js` sequentially appends `<script>` elements to the DOM for all built-in scripts, followed by the dynamically discovered tab scripts.
 5. **DOM Container Preparation**: Once all scripts are loaded, `app.js` processes the tab list. For any top-level tab, it checks if a corresponding content div exists. If not, it creates:
    `<div id="tab-slug" class="tab-content" role="tabpanel" tabindex="0" aria-labelledby="nav-slug">`
-   where the container ID slug is derived from the name: `'tab-' + name.toLowerCase().replace(/\s+/g, '-')`. Sub-pill content divs follow the same pattern but reference their pill button: `aria-labelledby="pill-slug"`.
+   where the container ID slug is derived from the name by replacing non-alphanumeric runs with `-` and trimming leading/trailing hyphens: `'tab-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')` (for example, `'Intervals.icu'` becomes `'tab-intervals-icu'`). Sub-pill content divs follow the same pattern but reference their pill button: `aria-labelledby="pill-slug"`.
 6. **Navigation Render**: The bottom navigation links and sub-pill buttons are rendered. Each bottom-nav link carries `role="tab"`, `aria-selected`, and `aria-controls` pointing at its specific panel. Sub-pill buttons carry the same ARIA attributes, and the pill bar container has `role="tablist"`.
 7. **Initial Activation**: The default tab is activated, triggering the `tab-changed` event and causing the script to render its content.
 

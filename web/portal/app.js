@@ -591,7 +591,7 @@ document.addEventListener('DOMContentLoaded', function() {
       var topSlug = slugifyTabName(topTab.name);
       var topId = 'tab-' + topSlug;
       var topRawId = topTab.id ? topTab.id.toLowerCase() : '';
-      if (topId === candidateId || topSlug === slug || topSlug === normSlug || topRawId === slug || ('tab-' + topRawId) === candidateId) {
+      if (topId === candidateId || topSlug === slug || (normSlug && topSlug === normSlug) || topRawId === slug || ('tab-' + topRawId) === candidateId) {
         return { topTabId: topId, subPillId: null };
       }
     }
@@ -604,7 +604,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var childSlug = slugifyTabName(child.name);
         var childId = 'tab-' + childSlug;
         var childRawId = child.id ? child.id.toLowerCase() : '';
-        if (childId === candidateId || childSlug === slug || childSlug === normSlug || childRawId === slug || ('tab-' + childRawId) === candidateId) {
+        if (childId === candidateId || childSlug === slug || (normSlug && childSlug === normSlug) || childRawId === slug || ('tab-' + childRawId) === candidateId) {
           var parentTopId = 'tab-' + slugifyTabName(parent);
           return { topTabId: parentTopId, subPillId: childId, parentName: parent };
         }
@@ -614,7 +614,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // 3. Check DOM elements directly in case an injected or hardcoded tab doesn't match topLevelTabs
     var targetEl = document.getElementById(candidateId);
     if (targetEl && targetEl.classList.contains('tab-content')) {
-      var pillBtn = document.querySelector('.pill-btn[data-target="' + candidateId + '"]');
+      var pillBtn = null;
+      var pillBtns = document.querySelectorAll('.pill-btn');
+      for (var k = 0; k < pillBtns.length; k++) {
+        if (pillBtns[k].getAttribute('data-target') === candidateId) {
+          pillBtn = pillBtns[k];
+          break;
+        }
+      }
       if (pillBtn) {
         var pName = pillBtn.getAttribute('data-parent');
         return { topTabId: 'tab-' + slugifyTabName(pName), subPillId: candidateId, parentName: pName };
