@@ -35,7 +35,7 @@ charter:
     && python3 scripts/check_doc_cpp_samples.py && python3 scripts/run_web_tests.py
   charter_locked: true
   charter_hash: 8a4d86cecc1acf4b3eb23c76a62950230468e5a5b0928bbc2d61c391989ddae2
-status: APPROVED
+status: AUDIT_APPROVED
 approved_at: '2026-11-17T07:23:05.000071Z'
 github_pr: null
 work_orders:
