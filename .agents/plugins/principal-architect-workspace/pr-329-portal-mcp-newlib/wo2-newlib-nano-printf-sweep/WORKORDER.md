@@ -5,7 +5,7 @@ pr_id: PR-329
 title: Replace 11 remaining %zu format specifiers, add unit tests, and add check_newlib_printf
   CI gate
 complexity: standard
-status: PENDING
+status: COMPLETED
 allowed_files:
 - modules/TimeManager/TimeManager.cpp
 - modules/Application/RedactorPreconditionContributor.hpp
@@ -33,7 +33,30 @@ verification_command: python3 scripts/check_newlib_printf.py && pytest scripts/t
 max_attempts: 5
 max_structural_failures: 2
 spec_hash: 9a8fa52eb46a8e7ae2789fee994c1de3a9a9d29b4a2f0774fc8e4aed65a38cc7
-completion: null
+completion:
+  status: COMPLETED
+  attempt_num: 3
+  receipt_id: rcpt_88ec3b56ad89
+  commit_sha: 6a29a5bfe81b2a4c878e9f75cf6b4ad3bd7637a9
+  files_modified:
+  - .github/workflows/ci.yml
+  - lib/MD5Utils/MD5Utils.cpp
+  - modules/Application/RedactorPreconditionContributor.hpp
+  - modules/BLEManager/BLEAdvertisingBuilder.cpp
+  - modules/ConfigManager/JsonPatch.cpp
+  - modules/EncoderModule/EncoderModule.cpp
+  - modules/TimeManager/TimeManager.cpp
+  - modules/WebServer/WebServer.cpp
+  - scripts/check_newlib_printf.py
+  - scripts/tests/test_check_newlib_printf.py
+  - test/test_unit/test_application/test_application.cpp
+  - test/test_unit/test_mcpServer/test_mcpServer.cpp
+  verification_summary: 'python3 scripts/check_newlib_printf.py && pytest scripts/tests/
+    && python3 scripts/doc_lint.py && python3 scripts/check_doc_cpp_samples.py: ======================================================================'
+  out_of_scope_findings: []
+  escalation_request: null
+  decisions_made: []
+  dead_ends: []
 ---
 
 # WO-329.2 — Replace 11 remaining %zu format specifiers, add unit tests, and add check_newlib_printf CI gate

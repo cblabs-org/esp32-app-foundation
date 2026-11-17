@@ -52,9 +52,9 @@ work_orders:
   title: Replace 11 remaining %zu format specifiers, add unit tests, and add check_newlib_printf
     CI gate
   complexity: standard
-  status: PENDING
-  attempts: 0
-  commit_sha: null
+  status: COMPLETED
+  attempts: 3
+  commit_sha: 6a29a5bfe81b2a4c878e9f75cf6b4ad3bd7637a9
 ---
 
 # PR-329 — fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu format bugs
