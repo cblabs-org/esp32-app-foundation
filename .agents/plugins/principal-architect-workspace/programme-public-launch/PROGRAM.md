@@ -74,6 +74,36 @@ prs:
   required_skills: []
   status: GRADUATED
   github_pr: null
+- id: PR-329
+  slug: pr-329-portal-mcp-newlib
+  title: 'fix(portal,core): slugify non-alnum tab IDs and eliminate Newlib-nano %zu
+    format bugs'
+  branch: fix/portal-tab-slug-and-mcp-log-format
+  base_branch: main
+  depends_on: []
+  allowed_modules:
+  - web/portal/app.js
+  - test/web/tests/navigation.spec.ts
+  - .agents/skills/framework-expert/systems/web-portal/html-js-fragments.md
+  - .agents/skills/framework-expert/systems/web-portal/overview.md
+  - docs/developer/extending-the-web-portal.md
+  - modules/MCPServer/MCPServer.cpp
+  - modules/MCPServer/MCPBuiltinTools.cpp
+  - modules/TimeManager/TimeManager.cpp
+  - modules/Application/RedactorPreconditionContributor.hpp
+  - modules/ConfigManager/JsonPatch.cpp
+  - modules/BLEManager/BLEAdvertisingBuilder.cpp
+  - modules/WebServer/WebServer.cpp
+  - modules/EncoderModule/EncoderModule.cpp
+  - lib/MD5Utils/MD5Utils.cpp
+  - test/test_unit/test_mcpServer/test_mcpServer.cpp
+  - test/test_unit/test_application/test_application.cpp
+  - scripts/check_newlib_printf.py
+  - scripts/tests/test_check_newlib_printf.py
+  - .github/workflows/ci.yml
+  required_skills: []
+  status: PLANNED
+  github_pr: null
 ---
 
 # Public Launch v1.0.0-beta.1
