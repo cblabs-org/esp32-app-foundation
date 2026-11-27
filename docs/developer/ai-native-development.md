@@ -46,7 +46,7 @@ task:
 | `00-operating-model.md` | Who may authorise what in the tiered model (section 4) |
 | `01-plan-before-execute.md` | No code changes until a human approves the plan; never build on someone else's uncommitted work |
 | `02-tmp_workspace.md` | Scratch files go in the repo's ignored `tmp/` folder |
-| `03-versioning.md` | Tag before flashing; agents may create `dev` tags only; beta and stable tags and releases are human-only |
+| `03-versioning.md` | Tag before flashing; agents may increment within an open dev or beta series; channel promotions (dev → beta, rc, stable) require human approval and release signing is human-only |
 | `04-mcp-tooling.md` | Builds, tests and uploads go through the PlatformIO MCP server and its hardware lock |
 | `github-reads.md` | With the maintainers' bug-fixer plugin, GitHub issues are read through a sanitising script |
 | `bug-fixer-AGENTS.md` | Safety rules for the autonomous bug-fixing loop (never merge, never edit the spec, one issue per PR) |
