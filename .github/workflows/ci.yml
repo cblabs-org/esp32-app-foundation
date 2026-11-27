@@ -117,12 +117,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.platformio
-          key: ${{ runner.os }}-pio-native-v2-${{ hashFiles('platformio.ini') }}
+          key: ${{ runner.os }}-pio-native-v3-${{ hashFiles('platformio.ini') }}
           restore-keys: |
-            ${{ runner.os }}-pio-native-v2-
+            ${{ runner.os }}-pio-native-v3-
 
       - name: Install PlatformIO
-        run: pip install "platformio==6.1.19"
+        run: pip install "pioarduino==6.2.0"
 
       - name: Run native unit tests
         run: pio test -e native
@@ -180,13 +180,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.platformio
-          key: ${{ runner.os }}-pio-fw-v2-${{ matrix.name }}-${{ hashFiles('platformio.ini', 'sample-app/platformio.ini', 'template-app/platformio.ini') }}
+          key: ${{ runner.os }}-pio-fw-v3-${{ matrix.name }}-${{ hashFiles('platformio.ini', 'sample-app/platformio.ini', 'template-app/platformio.ini') }}
           restore-keys: |
-            ${{ runner.os }}-pio-fw-v2-${{ matrix.name }}-
-            ${{ runner.os }}-pio-fw-v2-
+            ${{ runner.os }}-pio-fw-v3-${{ matrix.name }}-
+            ${{ runner.os }}-pio-fw-v3-
 
       - name: Install PlatformIO
-        run: pip install "platformio==6.1.19"
+        run: pip install "pioarduino==6.2.0"
 
       - name: Build firmware environments
         env:
