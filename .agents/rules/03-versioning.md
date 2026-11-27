@@ -44,18 +44,20 @@ esptool/OTA upload command, stop and verify:
 
 ## Quick Reference
 
-| Tag format              | Channel  | Agent can tag? | Requires user? |
-|-------------------------|----------|---------------|----------------|
-| `v0.X.Y-dev.N`         | Dev      | ✅ Yes         | No             |
-| `v0.X.Y-beta.N`        | Beta     | ❌ No          | Yes            |
-| `v0.X.Y`               | Stable   | ❌ No          | Yes            |
+| Tag format              | Channel | Agent can tag?                         | Requires user?                                    |
+|-------------------------|---------|----------------------------------------|---------------------------------------------------|
+| `v0.X.Y-dev.N`          | Dev     | ✅ Yes (same PATCH)                    | Only to open a new PATCH (`--new-series`)         |
+| `v0.X.Y-beta.N`         | Beta    | ✅ Yes (within open beta series)       | Only to promote `dev` → `beta` or open new PATCH (`--new-series`) |
+| `v0.X.Y-rc.N` / `v0.X.Y`| RC / Stable | ❌ No                              | Yes                                               |
 
-| Action                        | Agent autonomy | Requires user approval |
-|-------------------------------|---------------|------------------------|
-| Create `dev` tag              | ✅ Yes         | No                     |
-| Create `beta` / `stable` tag  | ❌ No          | Yes                    |
-| Increment `PATCH`/`MINOR`/`MAJOR` | ❌ No     | Yes                    |
-| Run `deploy_release.py` (any) | ❌ No*          | Yes (User runs CLI)    |
+| Action                              | Agent autonomy                      | Requires user approval        |
+|-------------------------------------|-------------------------------------|-------------------------------|
+| Increment `dev` series              | ✅ Yes                              | No                            |
+| Increment open `beta` series        | ✅ Yes (`--channel beta --tag --push`) | No                         |
+| Promote `dev` → `beta` (new series) | ❌ No (`--new-series` only after approval) | Yes                     |
+| Create `rc` / `stable` tag          | ❌ No                               | Yes                           |
+| Increment `PATCH`/`MINOR`/`MAJOR`   | ❌ No                               | Yes                           |
+| Run `deploy_release.py` (sign/publish, any) | ❌ No*                      | Yes (User runs CLI)           |
 
 * **Agents MUST NEVER execute `deploy_release.py` directly.** The private key requires an interactive passphrase, which causes background agent tasks to hang indefinitely on `openssl`. Always output the exact CLI command and ask the user to run it in their terminal.
 

@@ -137,9 +137,43 @@ def repo(tmp_path):
     return make
 
 
-def test_cli_refuses_to_tag_beta(repo, capsys):
+def test_cli_refuses_new_beta_series_without_flag(repo, capsys):
     path = repo("v0.1.0-dev.1")
     assert next_version.main(["-C", path, "--channel", "beta", "--tag"]) == 2
+    assert "new beta series" in capsys.readouterr().err
+    assert next_version.main(["-C", path, "--channel", "beta", "--tag", "--new-series"]) == 0
+    tag_list = subprocess.run(["git", "tag"], cwd=path, capture_output=True, text=True).stdout
+    assert "v0.1.0-beta.1" in tag_list
+
+
+def test_cli_tags_within_beta_series(repo):
+    path = repo("v1.0.0-beta.2")
+    assert next_version.main(["-C", path, "--channel", "beta", "--tag"]) == 0
+    tag_list = subprocess.run(["git", "tag"], cwd=path, capture_output=True, text=True).stdout
+    assert "v1.0.0-beta.3" in tag_list
+
+
+def test_cli_tags_within_long_beta_while_dev_runs_ahead(repo):
+    path = repo("v1.0.0-beta.2", "v1.0.1-dev.4")
+    assert next_version.main(["-C", path, "--channel", "beta", "--tag"]) == 0
+    tag_list = subprocess.run(["git", "tag"], cwd=path, capture_output=True, text=True).stdout
+    assert "v1.0.0-beta.3" in tag_list
+
+
+def test_cli_refuses_new_beta_patch_after_stable_without_flag(repo, capsys):
+    path = repo("v1.0.0-beta.2", "v1.0.0")
+    assert next_version.main(["-C", path, "--channel", "beta", "--tag"]) == 2
+    assert "new beta series" in capsys.readouterr().err
+    assert next_version.main(["-C", path, "--channel", "beta", "--tag", "--new-series"]) == 0
+    tag_list = subprocess.run(["git", "tag"], cwd=path, capture_output=True, text=True).stdout
+    assert "v1.0.1-beta.1" in tag_list
+
+
+def test_cli_refuses_to_tag_rc_and_stable(repo, capsys):
+    path = repo("v1.0.0-beta.2")
+    assert next_version.main(["-C", path, "--channel", "rc", "--tag", "--new-series"]) == 2
+    assert "human-only" in capsys.readouterr().err
+    assert next_version.main(["-C", path, "--channel", "stable", "--tag", "--new-series"]) == 2
     assert "human-only" in capsys.readouterr().err
 
 

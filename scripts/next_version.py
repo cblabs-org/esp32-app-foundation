@@ -20,14 +20,15 @@ Description: Prints the next legal version tag for a release channel.
         During a long beta, dev therefore runs ahead (v1.0.1-dev.N) while
         betas stay on v1.0.0-beta.N until it is promoted.
       - --bump and --target choose the core explicitly.
-      - Only dev tags can be created (--tag), and only within the current
-        dev series unless --new-series is given after the user approves the
-        PATCH increment. beta, rc, stable, MINOR and MAJOR are human-only.
+      - dev and beta tags can be created (--tag) within an existing series;
+        opening a new dev PATCH or starting a new beta series (dev -> beta
+        or new PATCH) requires --new-series after user approval. rc, stable,
+        MINOR and MAJOR are human-only.
 
 Usage:
     python3 scripts/next_version.py --current
     python3 scripts/next_version.py --channel dev [--tag [--push] [--new-series]]
-    python3 scripts/next_version.py --channel beta [--bump patch|minor|major | --target X.Y.Z]
+    python3 scripts/next_version.py --channel beta [--tag [--push] [--new-series]] [--bump patch|minor|major | --target X.Y.Z]
 
 Exported Functions:
 - compute_next(): Pure next-version calculation over a list of Versions
@@ -143,10 +144,10 @@ def main(argv: list[str] | None = None) -> int:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--bump", choices=("patch", "minor", "major"), help="Start a new core (human decision)")
     group.add_argument("--target", type=_parse_core, help="Use this X.Y.Z core (human decision)")
-    parser.add_argument("--tag", action="store_true", help="Create the tag locally (dev channel only)")
+    parser.add_argument("--tag", action="store_true", help="Create the tag locally (dev and beta channels only)")
     parser.add_argument("--push", action="store_true", help="With --tag: also push it to origin")
     parser.add_argument("--new-series", action="store_true",
-                        help="With --tag: allow a dev tag that opens a new PATCH (only after the user approves)")
+                        help="With --tag: allow opening a new dev PATCH or starting a new beta series (only after the user approves)")
     parser.add_argument("--fetch", action="store_true", help="Run 'git fetch --tags' first")
     parser.add_argument("-C", dest="repo", default=".", help="Repository directory (default: .)")
     args = parser.parse_args(argv)
@@ -173,17 +174,23 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     # --- Tagging guard rails (rule .agents/rules/03-versioning.md) ---
-    if args.channel != "dev":
+    if args.channel not in ("dev", "beta"):
         print(f"refused: {args.channel} tags are human-only; run 'git tag {nxt.tag}' yourself", file=sys.stderr)
         return 2
     if args.bump in ("minor", "major") or args.target is not None:
         print("refused: MINOR/MAJOR and --target changes are human-only", file=sys.stderr)
         return 2
-    top = _highest(versions)
-    if top is not None and nxt.core != top.core and not args.new_series:
-        print(f"refused: {nxt.tag} opens a new PATCH series after {top.tag}; ask the user, "
-              f"then re-run with --new-series", file=sys.stderr)
-        return 2
+    if args.channel == "dev":
+        top = _highest(versions)
+        if top is not None and nxt.core != top.core and not args.new_series:
+            print(f"refused: {nxt.tag} opens a new PATCH series after {top.tag}; ask the user, "
+                  f"then re-run with --new-series", file=sys.stderr)
+            return 2
+    elif args.channel == "beta":
+        if nxt.pre == 1 and not args.new_series:
+            print(f"refused: {nxt.tag} starts a new beta series (promoting to beta requires user approval); "
+                  f"ask the user, then re-run with --new-series", file=sys.stderr)
+            return 2
 
     subprocess.run(["git", "tag", nxt.tag], cwd=args.repo, check=True)
     print(f"created tag {nxt.tag}", file=sys.stderr)
