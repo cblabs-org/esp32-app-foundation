@@ -7,9 +7,16 @@
 
 #include <gtest/gtest.h>
 #include <ArduinoJson.h>
+#include <PsychicHttp.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
+#include <filesystem>
+#include <functional>
 #include "../../../modules/WifiManager/WifiManager.hpp"
+#include "ConfigManager.hpp"
+#include "ConfigRoot.hpp"
+#include "DeviceCrypto.hpp"
+#include "KeyManager.hpp"
 #include "../test_helpers/MockTabRegistry.hpp"
 
 class WifiManagerTest : public ::testing::Test {
@@ -502,6 +509,346 @@ TEST(WifiPreconditionContributorTest, EvaluationAndDescriptions) {
     // 4. Severity derivation for FallbackEngaged (AP mode)
     EXPECT_EQ(deriveSeverity(Cause::FallbackEngaged, false), Severity::Degraded);
     EXPECT_EQ(deriveSeverity(Cause::FallbackEngaged, true), Severity::Degraded);
+}
+
+// ---------------------------------------------------------------------------
+// SoftAP provisioning race & HTTP route tests (issue #332)
+//
+// Note: test/stubs/platform/WiFi.h stubs WL_CONNECTED and WiFi.mode() as
+// no-ops, and FreeRTOSMutex is a no-op stub on native. These tests exercise
+// the cross-core flag/staging sequencing deterministically by pumping
+// WifiManager::tick() mid-KeyManager encryption and mid-response->send()
+// during POST /api/wifi/connect, POST /api/wifi/forget, and updateWiFi().
+// ---------------------------------------------------------------------------
+
+namespace {
+
+class MockWifiHttpRequest : public PsychicRequest {
+public:
+    explicit MockWifiHttpRequest(std::string bodyStr = "", size_t overrideLen = 0)
+        : _body(std::move(bodyStr)), _overrideLen(overrideLen) {}
+    const char* bodyCStr() override { return _body.c_str(); }
+    size_t contentLength() override { return _overrideLen > 0 ? _overrideLen : _body.size(); }
+private:
+    std::string _body;
+    size_t _overrideLen;
+};
+
+class MockWifiHttpResponse : public PsychicResponse {
+public:
+    std::function<void()> onSend;
+    int lastCode = 0;
+    std::string lastContentType;
+    std::string lastBody;
+
+    esp_err_t send(int code, const char* contentType, const char* content) override {
+        lastCode = code;
+        lastContentType = contentType ? contentType : "";
+        lastBody = content ? content : "";
+        if (onSend) {
+            onSend();
+        }
+        return ESP_OK;
+    }
+};
+
+class EncryptHookDeviceCrypto : public DeviceCrypto {
+public:
+    std::function<void()> onEncrypt;
+
+    std::unique_ptr<char[]> encrypt(const char* plaintext, size_t inputLen, size_t* outLen) override {
+        if (onEncrypt) {
+            onEncrypt();
+        }
+        if (!plaintext || inputLen == 0) {
+            if (outLen) *outLen = 0;
+            return nullptr;
+        }
+        std::string enc = "ENC:" + std::string(plaintext, inputLen);
+        if (outLen) *outLen = enc.length();
+        char* buf = new char[enc.length() + 1];
+        strcpy(buf, enc.c_str());
+        return std::unique_ptr<char[]>(buf);
+    }
+
+    std::unique_ptr<char[]> decrypt(const char* ciphertext, size_t inputLen, size_t* outLen) override {
+        if (!ciphertext || inputLen == 0) {
+            if (outLen) *outLen = 0;
+            return nullptr;
+        }
+        std::string ct(ciphertext, inputLen);
+        if (ct.rfind("ENC:", 0) == 0) {
+            std::string pt = ct.substr(4);
+            if (outLen) *outLen = pt.length();
+            char* buf = new char[pt.length() + 1];
+            strcpy(buf, pt.c_str());
+            return std::unique_ptr<char[]>(buf);
+        }
+        if (outLen) *outLen = 0;
+        return nullptr;
+    }
+};
+
+class WifiProvisioningTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        WiFi.resetTestStubs();
+        std::error_code ec;
+        std::filesystem::create_directories(ConfigRoot::getEtcPath(), ec);
+        std::filesystem::create_directories(ConfigRoot::getModPath(), ec);
+        std::filesystem::remove(ConfigRoot::getEtcFilePath("keys.json").c_str(), ec);
+        std::filesystem::remove(ConfigRoot::getModFilePath("wifi").c_str(), ec);
+        std::filesystem::remove(ConfigRoot::getEtcFilePath("manifest.json").c_str(), ec);
+        std::filesystem::remove(ConfigRoot::getModFilePath("manifest.json").c_str(), ec);
+
+        keyManager.begin(&crypto);
+        wifi.setKeyManager(&keyManager);
+        wifi.setConfigManager(&configManager);
+        wifi.setEventBus(&bus);
+        configManager.registerModule(&wifi);
+        configManager.beginAll();
+        wifi.registerRoutes(server);
+    }
+
+    void TearDown() override {
+        std::error_code ec;
+        std::filesystem::remove(ConfigRoot::getEtcFilePath("keys.json").c_str(), ec);
+        std::filesystem::remove(ConfigRoot::getModFilePath("wifi").c_str(), ec);
+        std::filesystem::remove(ConfigRoot::getEtcFilePath("manifest.json").c_str(), ec);
+        std::filesystem::remove(ConfigRoot::getModFilePath("manifest.json").c_str(), ec);
+    }
+
+    PsychicHttpRequestCallback findRoute(const char* uri, int method) {
+        for (const auto& r : server.routes) {
+            if (r.uri == uri && r.method == method) {
+                return r.handler;
+            }
+        }
+        return nullptr;
+    }
+
+    EncryptHookDeviceCrypto crypto;
+    KeyManager keyManager;
+    ConfigManager configManager;
+    EventBus bus;
+    PsychicHttpServer server;
+    WifiManager wifi;
+};
+
+} // namespace
+
+TEST_F(WifiProvisioningTest, PostConnectDoesNotTearDownSoftApMidSaveOrMidResponse) {
+    EventCounter counter;
+    bus.subscribe(WifiEvents::WIFI_CONNECTED, &EventCounter::onConnected, &counter);
+
+    wifi.begin();
+    wifi.tick(2000);   // Init -> ApStarting
+    wifi.tick(2001);   // ApStarting -> Ready (first-boot setup AP active)
+    ASSERT_TRUE(wifi.getAPMode());
+    ASSERT_TRUE(wifi.isSetupMode());
+
+    auto connectHandler = findRoute("/api/wifi/connect", HTTP_POST);
+    ASSERT_NE(connectHandler, nullptr);
+
+    bool encryptHookRan = false;
+    bool apAliveDuringEncrypt = false;
+    bool credsHiddenDuringEncrypt = false;
+    bool setupModeDuringEncrypt = false;
+
+    crypto.onEncrypt = [&]() {
+        encryptHookRan = true;
+        // Simulate Core 1 tick() running while Core 0 is inside KeyManager flash I/O
+        wifi.tick(2500);
+        wifi.tick(2501);
+        apAliveDuringEncrypt = wifi.getAPMode();
+        credsHiddenDuringEncrypt = !wifi.hasCredentials();
+        setupModeDuringEncrypt = wifi.isSetupMode();
+    };
+
+    bool sendHookRan = false;
+    bool apAliveDuringSend = false;
+    bool credsHiddenDuringSend = false;
+
+    MockWifiHttpRequest req("{\"ssid\":\"HomeNet\",\"pass\":\"secret123\"}");
+    MockWifiHttpResponse resp;
+    resp.onSend = [&]() {
+        sendHookRan = true;
+        // Simulate Core 1 tick() running while Core 0 sends HTTP 200 over SoftAP
+        wifi.tick(2600);
+        wifi.tick(2601);
+        apAliveDuringSend = wifi.getAPMode();
+        credsHiddenDuringSend = !wifi.hasCredentials();
+    };
+
+    esp_err_t err = connectHandler(&req, &resp);
+    EXPECT_EQ(ESP_OK, err);
+    EXPECT_EQ(200, resp.lastCode);
+    EXPECT_NE(resp.lastBody.find("Credentials saved. Restarting..."), std::string::npos);
+
+    EXPECT_TRUE(encryptHookRan);
+    EXPECT_TRUE(apAliveDuringEncrypt);
+    EXPECT_TRUE(credsHiddenDuringEncrypt);
+    EXPECT_TRUE(setupModeDuringEncrypt);
+
+    EXPECT_TRUE(sendHookRan);
+    EXPECT_TRUE(apAliveDuringSend);
+    EXPECT_TRUE(credsHiddenDuringSend);
+
+    // Credentials are now committed in RAM and persisted on disk
+    EXPECT_STREQ("HomeNet", wifi.getSSID());
+    EXPECT_TRUE(wifi.hasCredentials());
+    EXPECT_TRUE(wifi.hasPassword());
+    EXPECT_FALSE(wifi.isSetupMode());
+    EXPECT_TRUE(wifi.getAPMode());
+    EXPECT_EQ("secret123", keyManager.getKeyById("wifi_password"));
+
+    // Verify a fresh WifiManager loading from persisted ConfigManager sees HomeNet
+    WifiManager reloaded;
+    ConfigManager reloadCm;
+    reloaded.setKeyManager(&keyManager);
+    reloaded.setConfigManager(&reloadCm);
+    reloadCm.registerModule(&reloaded);
+    reloadCm.beginAll();
+    EXPECT_STREQ("HomeNet", reloaded.getSSID());
+    EXPECT_TRUE(reloaded.hasPassword());
+
+    // Next tick() executes deferred restart (without tearing down SoftAP via _reconnectRequested)
+    wifi.tick(2700);
+    EXPECT_TRUE(wifi.getAPMode());
+    EXPECT_EQ(0, counter.connected);
+}
+
+TEST_F(WifiProvisioningTest, PostConnectEmptyPasswordPreservesStoredPasswordAndSchedulesRestart) {
+    wifi.updateWiFi("OldNet", "oldpass123");
+    wifi.tick(2000); // consume _reconnectRequested from updateWiFi
+
+    auto connectHandler = findRoute("/api/wifi/connect", HTTP_POST);
+    ASSERT_NE(connectHandler, nullptr);
+
+    MockWifiHttpRequest req("{\"ssid\":\"NewNet\",\"pass\":\"\"}");
+    MockWifiHttpResponse resp;
+    bool ssidWasOldDuringSend = false;
+    resp.onSend = [&]() {
+        ssidWasOldDuringSend = (std::string(wifi.getSSID()) == "OldNet");
+    };
+
+    esp_err_t err = connectHandler(&req, &resp);
+    EXPECT_EQ(ESP_OK, err);
+    EXPECT_EQ(200, resp.lastCode);
+    EXPECT_TRUE(ssidWasOldDuringSend);
+    EXPECT_STREQ("NewNet", wifi.getSSID());
+    EXPECT_TRUE(wifi.hasPassword());
+    EXPECT_EQ("oldpass123", keyManager.getKeyById("wifi_password"));
+}
+
+TEST_F(WifiProvisioningTest, PostConnectRejectsInvalidPayloadsWithoutMutatingState) {
+    wifi.begin();
+    wifi.tick(2000);
+    wifi.tick(2001);
+    ASSERT_TRUE(wifi.isSetupMode());
+
+    auto connectHandler = findRoute("/api/wifi/connect", HTTP_POST);
+    ASSERT_NE(connectHandler, nullptr);
+
+    {
+        MockWifiHttpRequest req("{\"ssid\":\"HomeNet\"}", 2048);
+        MockWifiHttpResponse resp;
+        EXPECT_EQ(ESP_FAIL, connectHandler(&req, &resp));
+        EXPECT_EQ(413, resp.lastCode);
+    }
+    {
+        MockWifiHttpRequest req("");
+        MockWifiHttpResponse resp;
+        EXPECT_EQ(ESP_FAIL, connectHandler(&req, &resp));
+        EXPECT_EQ(400, resp.lastCode);
+    }
+    {
+        MockWifiHttpRequest req("{not-json");
+        MockWifiHttpResponse resp;
+        EXPECT_EQ(ESP_FAIL, connectHandler(&req, &resp));
+        EXPECT_EQ(400, resp.lastCode);
+    }
+    {
+        MockWifiHttpRequest req("{\"ssid\":\"\",\"pass\":\"secret\"}");
+        MockWifiHttpResponse resp;
+        EXPECT_EQ(ESP_FAIL, connectHandler(&req, &resp));
+        EXPECT_EQ(400, resp.lastCode);
+    }
+
+    EXPECT_FALSE(wifi.hasCredentials());
+    EXPECT_TRUE(wifi.isSetupMode());
+    wifi.tick(2500);
+    EXPECT_TRUE(wifi.getAPMode());
+}
+
+TEST_F(WifiProvisioningTest, PostForgetStagesErasureUntilHttpResponseCompletes) {
+    wifi.updateWiFi("HomeNet", "secret123");
+    wifi.tick(2000); // consume _reconnectRequested
+
+    auto forgetHandler = findRoute("/api/wifi/forget", HTTP_POST);
+    ASSERT_NE(forgetHandler, nullptr);
+
+    bool credsStillPresentDuringSend = false;
+    bool persistedEmptyDuringSend = false;
+    bool keyDeletedDuringSend = false;
+
+    MockWifiHttpRequest req("{}");
+    MockWifiHttpResponse resp;
+    resp.onSend = [&]() {
+        wifi.tick(2500);
+        credsStillPresentDuringSend = wifi.hasCredentials();
+        keyDeletedDuringSend = keyManager.getKeyById("wifi_password").empty();
+
+        WifiManager probe;
+        ConfigManager probeCm;
+        probe.setKeyManager(&keyManager);
+        probe.setConfigManager(&probeCm);
+        probeCm.registerModule(&probe);
+        probeCm.beginAll();
+        persistedEmptyDuringSend = !probe.hasCredentials();
+    };
+
+    esp_err_t err = forgetHandler(&req, &resp);
+    EXPECT_EQ(ESP_OK, err);
+    EXPECT_EQ(200, resp.lastCode);
+    EXPECT_TRUE(credsStillPresentDuringSend);
+    EXPECT_TRUE(persistedEmptyDuringSend);
+    EXPECT_TRUE(keyDeletedDuringSend);
+    EXPECT_FALSE(wifi.hasCredentials());
+    EXPECT_FALSE(wifi.hasPassword());
+}
+
+TEST_F(WifiProvisioningTest, UpdateWiFiPreservesDeferredReconnectWithoutMidSaveApTeardown) {
+    EventCounter counter;
+    bus.subscribe(WifiEvents::WIFI_CONNECTED, &EventCounter::onConnected, &counter);
+
+    wifi.begin();
+    wifi.tick(2000);
+    wifi.tick(2001);
+    ASSERT_TRUE(wifi.isSetupMode());
+
+    bool encryptHookRan = false;
+    bool apAliveMidSave = false;
+    crypto.onEncrypt = [&]() {
+        encryptHookRan = true;
+        wifi.tick(2500);
+        wifi.tick(2501);
+        apAliveMidSave = wifi.getAPMode();
+    };
+
+    wifi.updateWiFi("HomeNet", "secret123");
+    EXPECT_TRUE(encryptHookRan);
+    EXPECT_TRUE(apAliveMidSave);
+    EXPECT_STREQ("HomeNet", wifi.getSSID());
+    EXPECT_FALSE(wifi.isSetupMode());
+    EXPECT_TRUE(wifi.getAPMode());
+
+    wifi.tick(3000); // deferred reconnect now executes cleanly
+    EXPECT_FALSE(wifi.getAPMode());
+    wifi.tick(5000); // Init -> STA attempt
+    wifi.tick(5001); // StaConnecting -> connected (stub)
+    EXPECT_TRUE(wifi.isReady());
+    EXPECT_EQ(1, counter.connected);
 }
 
 int main(int argc, char **argv) {

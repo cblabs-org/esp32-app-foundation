@@ -72,12 +72,15 @@
 
 #include <Arduino.h>
 
+#include <atomic>
 #include <memory>
+#include <mutex>
 #include <cstring>
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IConfigurable.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
+#include "platform/FreeRTOSMutex.hpp"
 #include "utils/Periodic.hpp"
 
 class DNSServer;
@@ -114,7 +117,7 @@ private:
     /**
      * @brief High-level states for the WiFi connection state machine.
      */
-    enum class WiFiState {
+    enum class WiFiState : uint8_t {
         Init,             // System just started, need to decide next step
         StaConnecting,    // One STA connect attempt in flight (15 s timeout)
         StaBackoff,       // Credentials stored, STA attempt failed: waiting the
@@ -132,27 +135,39 @@ private:
     static constexpr uint32_t FALLBACK_AP_DELAY_MS     = 180000;   ///< Continuous STA downtime before the fallback AP starts (matches isWifiPersistentError())
     static constexpr uint32_t AP_INACTIVITY_TIMEOUT_MS = 3600000;  ///< Portal inactivity before the AP is dropped
 
+    mutable FreeRTOSMutex _credMutex;        ///< Leaf mutex protecting credential & hostname buffers across Core 0 (httpd/MCP) and Core 1 (tick)
+    FreeRTOSMutex _persistOpMutex;           ///< Serialises multi-step credential persistence/HTTP provisioning operations
     char _wifiSsid[33];
     char _wifiPass[65];
+    char _pendingSsid[33];                   ///< Staged SSID persisted via serializeConfig() before committing _wifiSsid
+    bool _hasPendingSsid = false;            ///< True while serializeConfig() should emit _pendingSsid
     char _currentHostname[33];
     char _defaultHostname[33];               ///< App-supplied factory default hostname (set via setDefaultHostname)
-    bool _isAPMode = false;
-    WiFiState _currentState = WiFiState::Init;
+    std::atomic<bool> _isAPMode{false};
+    std::atomic<WiFiState> _currentState{WiFiState::Init};
     Periodic _stateTimer;
     int _connectionRetries = 0;               ///< Consecutive failed STA attempts (drives the backoff schedule)
     bool _fallbackApSuppressed = false;       ///< Fallback AP dropped after 1 h idle; not re-raised until STA reconnects
     Periodic _wifiDisconnectTimer; ///< Continuous downtime tracker (ms)
     char _myUrl[24];                        ///< Formatted string URL for local IP
-    volatile uint32_t _lastApiRequestTime = 0;  ///< Last time an API request was received (cross-thread)
+    std::atomic<uint32_t> _lastApiRequestTime{0};  ///< Last time an API request was received (cross-thread)
 
-    bool _reconnectRequested = false;        ///< Deferred reconnect flag (set by updateWiFi, acted on by tick)
-    bool _restartRequested = false;          ///< Deferred restart flag (set by connect/forget, acted on by tick)
+    std::atomic<bool> _reconnectRequested{false};     ///< Deferred reconnect flag (set by updateWiFi/Ready, acted on by tick)
+    std::atomic<bool> _restartRequested{false};       ///< Deferred restart flag (set by connect/forget, acted on by tick)
+    std::atomic<bool> _provisioningInProgress{false}; ///< True while credential persistence & HTTP response are in flight
 
     ConfigManager* _configManager = nullptr; ///< Pointer to ConfigManager for save operations
     KeyManager* _keyManager = nullptr;       ///< Pointer to KeyManager for encrypted password storage
     EventBus* _eventBus = nullptr;           ///< Pointer to EventBus for publishing wifi state events
 
     std::unique_ptr<DNSServer> _dnsServer;
+
+    struct ProvisioningGuard;
+    friend struct ProvisioningGuard;
+
+    void stageAndPersistCredentials(const char* ssid, const char* pass);
+    void commitStagedCredentials(const char* pass);
+    void clearPendingSsid();
 
     void transitionTo(WiFiState newState, uint32_t now);
     void processDNS();
@@ -396,7 +411,7 @@ public:
      *        outage (see isSetupMode() to tell them apart).
      * @return true if AP mode is active
      */
-    bool getAPMode() const { return _isAPMode; }
+    bool getAPMode() const { return _isAPMode.load(); }
 
     /**
      * @brief Returns true only for first-boot setup: AP active AND no stored credentials.
@@ -410,7 +425,7 @@ public:
      *
      * @return true if in first-boot setup mode
      */
-    bool isSetupMode() const { return _isAPMode && !hasCredentials(); }
+    bool isSetupMode() const { return _isAPMode.load() && !hasCredentials(); }
 
     /**
      * @brief Returns true if WiFi is ready (either STA connected or AP active).
@@ -418,7 +433,7 @@ public:
      *        while the state machine is cycling STA retries.
      * @return true if ready
      */
-    bool isReady() const { return _currentState == WiFiState::Ready || _isAPMode; }
+    bool isReady() const { return _currentState.load() == WiFiState::Ready || _isAPMode.load(); }
 
     // --- Reconnect policy (pure functions; unit-tested, #236) ---
 
@@ -456,7 +471,10 @@ public:
      * @brief Returns true if WiFi credentials (SSID) are configured.
      * @return true if SSID is non-empty
      */
-    bool hasCredentials() const { return strlen(_wifiSsid) > 0; }
+    bool hasCredentials() const {
+        std::lock_guard<FreeRTOSMutex> guard(_credMutex);
+        return _wifiSsid[0] != '\0';
+    }
 
     /**
      * @brief Returns the SSID of the AP mode captive portal network.
@@ -474,7 +492,10 @@ public:
      * @brief Returns true if a password is set.
      * @return true if a password exists
      */
-    bool hasPassword() const { return strlen(_wifiPass) > 0; }
+    bool hasPassword() const {
+        std::lock_guard<FreeRTOSMutex> guard(_credMutex);
+        return _wifiPass[0] != '\0';
+    }
 
     /**
      * @brief Test a WiFi connection without permanently changing stored credentials.
