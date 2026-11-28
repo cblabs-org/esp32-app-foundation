@@ -534,6 +534,8 @@ private:
     char             _deviceIPBuf[16] = {};
     /// Stable buffer for precondition help text pointer in configuring payloads.
     char             _helpTextBuf[128] = {};
+    /// Stable buffer for WiFi hostname pointer in configuring payloads.
+    char             _hostnameBuf[33] = {};
 
     DataManager _dataManager;           ///< Background data manager
     WebServerManager _webServerManager; ///< Local HTTP Server

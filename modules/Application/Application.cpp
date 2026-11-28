@@ -130,7 +130,9 @@ bool Application::begin(const FrameworkConfig& config) {
     // --- Device identity auto-propagation (issue #232) ---
     // WiFi: derive hostname from app name. Only sets the factory default;
     // persisted user config still wins on boot.
-    if (strcmp(_wifiManager.getDefaultHostname(), WifiManager::DEFAULT_HOSTNAME) == 0) {
+    char defaultHost[33];
+    _wifiManager.copyDefaultHostname(defaultHost, sizeof(defaultHost));
+    if (strcmp(defaultHost, WifiManager::DEFAULT_HOSTNAME) == 0) {
         String sanitised = sanitiseHostname(getAppName());
         _wifiManager.setDefaultHostname(sanitised.c_str());
     }
@@ -760,7 +762,8 @@ void Application::_publishConfiguringEvent(bool isRegression) {
     _configuringPayload.cause        = blocking->dampedStatus.cause;
     _configuringPayload.severity     = blocking->severity;
     _configuringPayload.isRegression = isRegression;
-    _configuringPayload.hostname     = _wifiManager.getHostname();
+    _wifiManager.copyHostname(_hostnameBuf, sizeof(_hostnameBuf));
+    _configuringPayload.hostname     = _hostnameBuf;
 
     if (_wifiManager.getAPMode()) {
         strncpy(_deviceIPBuf, "192.168.4.1", sizeof(_deviceIPBuf));

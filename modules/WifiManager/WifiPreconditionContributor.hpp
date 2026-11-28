@@ -63,13 +63,19 @@ public:
                     case Cause::NotConfigured:
                         snprintf(buf, len, "Connect to the device WiFi to configure");
                         break;
-                    case Cause::Connecting:
-                        snprintf(buf, len, "Connecting to %s...", self->_wifi.getSSID());
+                    case Cause::Connecting: {
+                        char ssid[33];
+                        self->_wifi.copySSID(ssid, sizeof(ssid));
+                        snprintf(buf, len, "Connecting to %s...", ssid);
                         break;
-                    case Cause::FallbackEngaged:
+                    }
+                    case Cause::FallbackEngaged: {
+                        char apSsid[33];
+                        self->_wifi.copyAPSSID(apSsid, sizeof(apSsid));
                         snprintf(buf, len, "Can't reach your network. Connect to %s",
-                                 self->_wifi.getAPSSID());
+                                 apSsid);
                         break;
+                    }
                     case Cause::Rejected:
                         snprintf(buf, len, "WiFi password was refused");
                         break;

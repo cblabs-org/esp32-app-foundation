@@ -75,7 +75,9 @@ void DiagnosticsBoard::configure(WifiManager* wifiManager) {
 
     // --- Set hostname label (static — only needs setting once) ---
     if (_wifiManager != nullptr) {
-        _row1.setText(_wifiManager->getHostname());
+        char host[33];
+        _wifiManager->copyHostname(host, sizeof(host));
+        _row1.setText(host);
     }
     _row1.setAlignment(1);  // CENTER
 
@@ -114,12 +116,16 @@ void DiagnosticsBoard::tick(uint32_t currentMillis) {
 
     // --- Row 2: WiFi SSID + IP ---
     if (WiFi.isConnected()) {
+        char ssid[33];
+        _wifiManager->copySSID(ssid, sizeof(ssid));
         snprintf(_wifiLine, sizeof(_wifiLine), "%s \xB7 %s",
-                 _wifiManager->getSSID(),
+                 ssid,
                  WiFi.localIP().toString().c_str());
     } else if (_wifiManager->getAPMode()) {
+        char host[33];
+        _wifiManager->copyHostname(host, sizeof(host));
         snprintf(_wifiLine, sizeof(_wifiLine), "AP: %s \xB7 192.168.4.1",
-                 _wifiManager->getHostname());
+                 host);
     } else {
         snprintf(_wifiLine, sizeof(_wifiLine), "WiFi: Not connected");
     }

@@ -72,12 +72,15 @@
 
 #include <Arduino.h>
 
+#include <atomic>
 #include <memory>
+#include <mutex>
 #include <cstring>
 #include "interfaces/ITickable.hpp"
 #include "interfaces/IConfigurable.hpp"
 #include "interfaces/IWebContributor.hpp"
 #include "interfaces/IMCPContributor.hpp"
+#include "platform/FreeRTOSMutex.hpp"
 #include "utils/Periodic.hpp"
 
 class DNSServer;
@@ -114,7 +117,7 @@ private:
     /**
      * @brief High-level states for the WiFi connection state machine.
      */
-    enum class WiFiState {
+    enum class WiFiState : uint8_t {
         Init,             // System just started, need to decide next step
         StaConnecting,    // One STA connect attempt in flight (15 s timeout)
         StaBackoff,       // Credentials stored, STA attempt failed: waiting the
@@ -132,27 +135,50 @@ private:
     static constexpr uint32_t FALLBACK_AP_DELAY_MS     = 180000;   ///< Continuous STA downtime before the fallback AP starts (matches isWifiPersistentError())
     static constexpr uint32_t AP_INACTIVITY_TIMEOUT_MS = 3600000;  ///< Portal inactivity before the AP is dropped
 
+    mutable FreeRTOSMutex _credMutex;        ///< Leaf mutex protecting credential & hostname buffers across Core 0 (httpd/MCP) and Core 1 (tick)
+    FreeRTOSMutex _persistOpMutex;           ///< Serialises multi-step credential persistence/HTTP provisioning operations
     char _wifiSsid[33];
     char _wifiPass[65];
+    char _pendingSsid[33];                   ///< Staged SSID persisted via serializeConfig() before committing _wifiSsid
+    bool _hasPendingSsid = false;            ///< True while serializeConfig() should emit _pendingSsid
     char _currentHostname[33];
     char _defaultHostname[33];               ///< App-supplied factory default hostname (set via setDefaultHostname)
-    bool _isAPMode = false;
-    WiFiState _currentState = WiFiState::Init;
+    std::atomic<bool> _isAPMode{false};
+    std::atomic<WiFiState> _currentState{WiFiState::Init};
     Periodic _stateTimer;
     int _connectionRetries = 0;               ///< Consecutive failed STA attempts (drives the backoff schedule)
     bool _fallbackApSuppressed = false;       ///< Fallback AP dropped after 1 h idle; not re-raised until STA reconnects
     Periodic _wifiDisconnectTimer; ///< Continuous downtime tracker (ms)
     char _myUrl[24];                        ///< Formatted string URL for local IP
-    volatile uint32_t _lastApiRequestTime = 0;  ///< Last time an API request was received (cross-thread)
+    std::atomic<uint32_t> _lastApiRequestTime{0};  ///< Last time an API request was received (cross-thread)
 
-    bool _reconnectRequested = false;        ///< Deferred reconnect flag (set by updateWiFi, acted on by tick)
-    bool _restartRequested = false;          ///< Deferred restart flag (set by connect/forget, acted on by tick)
+    std::atomic<bool> _reconnectRequested{false};     ///< Deferred reconnect flag (set by updateWiFi/Ready, acted on by tick)
+    std::atomic<bool> _restartRequested{false};       ///< Deferred restart flag (set by connect/forget, acted on by tick)
+    std::atomic<bool> _restarting{false};             ///< Latched while tick() flushes HTTP response before esp_restart()
+    std::atomic<bool> _provisioningInProgress{false}; ///< True while credential persistence & HTTP response are in flight
 
     ConfigManager* _configManager = nullptr; ///< Pointer to ConfigManager for save operations
     KeyManager* _keyManager = nullptr;       ///< Pointer to KeyManager for encrypted password storage
     EventBus* _eventBus = nullptr;           ///< Pointer to EventBus for publishing wifi state events
 
     std::unique_ptr<DNSServer> _dnsServer;
+
+    struct ProvisioningGuard;
+    friend struct ProvisioningGuard;
+
+    bool stageAndPersistCredentials(const char* ssid, const char* pass);
+    void commitStagedCredentials(const char* pass);
+    bool stageAndPersistErasure();
+    void commitStagedErasure();
+    void clearPendingSsid();
+    bool isRestartPending() const {
+        return _restartRequested.load() || _restarting.load();
+    }
+    bool isProvisioningOrRestarting() const {
+        // Read _provisioningInProgress before _restartRequested/_restarting so the
+        // release-acquire chain guarantees Core 1 observes _restartRequested == true.
+        return _provisioningInProgress.load() || _restartRequested.load() || _restarting.load();
+    }
 
     void transitionTo(WiFiState newState, uint32_t now);
     void processDNS();
@@ -356,13 +382,33 @@ public:
     void setDefaultHostname(const char* hostname);
 
     /**
+     * @brief Copy the app-supplied factory default hostname under _credMutex.
+     * @param buf Destination buffer.
+     * @param len Size of destination buffer in bytes.
+     */
+    void copyDefaultHostname(char* buf, size_t len) const;
+
+    /**
+     * @brief Copy the effective hostname (persisted or factory default) under _credMutex.
+     * @param buf Destination buffer.
+     * @param len Size of destination buffer in bytes.
+     */
+    void copyHostname(char* buf, size_t len) const;
+
+    /**
      * @brief Returns the app-supplied factory default hostname.
+     * @note Single-threaded boot / unit-test convenience accessor returning an
+     *       internal buffer pointer without locking; cross-core callers must use
+     *       copyDefaultHostname().
      * @return Default hostname string.
      */
     const char* getDefaultHostname() const { return _defaultHostname; }
 
     /**
      * @brief Returns the current effective hostname (persisted value or factory default).
+     * @note Single-threaded boot / unit-test convenience accessor returning an
+     *       internal buffer pointer without locking; cross-core callers must use
+     *       copyHostname().
      * @return Current hostname string.
      */
     const char* getHostname() const {
@@ -396,7 +442,7 @@ public:
      *        outage (see isSetupMode() to tell them apart).
      * @return true if AP mode is active
      */
-    bool getAPMode() const { return _isAPMode; }
+    bool getAPMode() const { return _isAPMode.load(); }
 
     /**
      * @brief Returns true only for first-boot setup: AP active AND no stored credentials.
@@ -410,7 +456,7 @@ public:
      *
      * @return true if in first-boot setup mode
      */
-    bool isSetupMode() const { return _isAPMode && !hasCredentials(); }
+    bool isSetupMode() const { return _isAPMode.load() && !hasCredentials(); }
 
     /**
      * @brief Returns true if WiFi is ready (either STA connected or AP active).
@@ -418,7 +464,7 @@ public:
      *        while the state machine is cycling STA retries.
      * @return true if ready
      */
-    bool isReady() const { return _currentState == WiFiState::Ready || _isAPMode; }
+    bool isReady() const { return _currentState.load() == WiFiState::Ready || _isAPMode.load(); }
 
     // --- Reconnect policy (pure functions; unit-tested, #236) ---
 
@@ -447,7 +493,17 @@ public:
     }
 
     /**
+     * @brief Copy the current stored SSID into a caller-owned buffer under _credMutex.
+     * @param buf Destination buffer.
+     * @param len Size of destination buffer in bytes.
+     */
+    void copySSID(char* buf, size_t len) const;
+
+    /**
      * @brief Returns the current stored SSID.
+     * @note Single-threaded boot / unit-test convenience accessor returning an
+     *       internal buffer pointer without locking; cross-core callers must use
+     *       copySSID().
      * @return current SSID
      */
     const char* getSSID() const { return _wifiSsid; }
@@ -456,10 +512,23 @@ public:
      * @brief Returns true if WiFi credentials (SSID) are configured.
      * @return true if SSID is non-empty
      */
-    bool hasCredentials() const { return strlen(_wifiSsid) > 0; }
+    bool hasCredentials() const {
+        std::lock_guard<FreeRTOSMutex> guard(_credMutex);
+        return _wifiSsid[0] != '\0';
+    }
+
+    /**
+     * @brief Copy the captive portal SoftAP SSID into a caller-owned buffer under _credMutex.
+     * @param buf Destination buffer.
+     * @param len Size of destination buffer in bytes.
+     */
+    void copyAPSSID(char* buf, size_t len) const;
 
     /**
      * @brief Returns the SSID of the AP mode captive portal network.
+     * @note Single-threaded boot / unit-test convenience accessor returning an
+     *       internal buffer pointer without locking; cross-core callers must use
+     *       copyAPSSID().
      * @return AP SSID (effective hostname or "ESP32-Setup")
      */
     const char* getAPSSID() const {
@@ -474,7 +543,10 @@ public:
      * @brief Returns true if a password is set.
      * @return true if a password exists
      */
-    bool hasPassword() const { return strlen(_wifiPass) > 0; }
+    bool hasPassword() const {
+        std::lock_guard<FreeRTOSMutex> guard(_credMutex);
+        return _wifiPass[0] != '\0';
+    }
 
     /**
      * @brief Test a WiFi connection without permanently changing stored credentials.
