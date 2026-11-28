@@ -72,13 +72,19 @@ static constexpr int MAX_SCAN_RESULTS = 15;
 
 struct WifiManager::ProvisioningGuard {
     WifiManager& self;
+    bool blockedByRestart = false;
     explicit ProvisioningGuard(WifiManager& wm) : self(wm) {
         self._persistOpMutex.lock();
-        self._provisioningInProgress.store(true);
+        blockedByRestart = self.isRestartPending();
+        if (!blockedByRestart) {
+            self._provisioningInProgress.store(true);
+        }
     }
     ~ProvisioningGuard() {
-        self.clearPendingSsid();
-        self._provisioningInProgress.store(false);
+        if (!blockedByRestart) {
+            self.clearPendingSsid();
+            self._provisioningInProgress.store(false);
+        }
         self._persistOpMutex.unlock();
     }
     ProvisioningGuard(const ProvisioningGuard&) = delete;
@@ -260,6 +266,39 @@ void WifiManager::connectStation(const char* ssid, const char* pass) {
  * value (applyConfig) or the factory default (resetConfig) — so begin() simply
  * relies on currentHostname rather than accepting a parameter.
  */
+void WifiManager::copyDefaultHostname(char* buf, size_t len) const {
+    if (!buf || len == 0) return;
+    std::lock_guard<FreeRTOSMutex> guard(_credMutex);
+    strlcpy(buf, _defaultHostname, len);
+}
+
+void WifiManager::copyHostname(char* buf, size_t len) const {
+    if (!buf || len == 0) return;
+    std::lock_guard<FreeRTOSMutex> guard(_credMutex);
+    const char* src = (_currentHostname[0] != '\0')
+        ? _currentHostname
+        : ((_defaultHostname[0] != '\0') ? _defaultHostname : DEFAULT_HOSTNAME);
+    strlcpy(buf, src, len);
+}
+
+void WifiManager::copySSID(char* buf, size_t len) const {
+    if (!buf || len == 0) return;
+    std::lock_guard<FreeRTOSMutex> guard(_credMutex);
+    strlcpy(buf, _wifiSsid, len);
+}
+
+void WifiManager::copyAPSSID(char* buf, size_t len) const {
+    if (!buf || len == 0) return;
+    std::lock_guard<FreeRTOSMutex> guard(_credMutex);
+    const char* host = (_currentHostname[0] != '\0')
+        ? _currentHostname
+        : ((_defaultHostname[0] != '\0') ? _defaultHostname : DEFAULT_HOSTNAME);
+    const char* src = (host[0] != '\0' && strcmp(host, DEFAULT_HOSTNAME) != 0)
+        ? host
+        : DEFAULT_AP_SSID;
+    strlcpy(buf, src, len);
+}
+
 void WifiManager::begin() {
     // Config is already loaded by ConfigManager::beginAll() calling applyConfig()
 
@@ -271,7 +310,9 @@ void WifiManager::begin() {
     
     _stateTimer.setInterval(2000);  // 2s debounce before Init fires (pre-MK: `elapsed > 2000`)
     transitionTo(WiFiState::Init, millis());
-    ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", getHostname());
+    char host[sizeof(_currentHostname)];
+    copyHostname(host, sizeof(host));
+    ESP_LOGI(TAG, "WiFi Manager initialized in NON-BLOCKING mode. Hostname: %s", host);
 }
 
 /**
@@ -328,8 +369,9 @@ void WifiManager::startStaAttempt(uint32_t now) {
              apActive ? ", fallback AP active" : "");
     WiFi.mode(apActive ? WIFI_AP_STA : WIFI_STA);
     applyPowerSave();
-    const char* host = getHostname();
-    if (strlen(host) > 0) {
+    char host[sizeof(_currentHostname)];
+    copyHostname(host, sizeof(host));
+    if (host[0] != '\0') {
         WiFi.setHostname(host);
     }
     connectStation(ssid, pass);
@@ -360,7 +402,8 @@ void WifiManager::onStaConnected(uint32_t now) {
     // end() first to cleanly restart on WiFi reconnections — prevents
     // "Service already exists" errors from duplicate addService() calls.
     MDNS.end();
-    const char* host = getHostname();
+    char host[sizeof(_currentHostname)];
+    copyHostname(host, sizeof(host));
     if (MDNS.begin(host)) {
         MDNS.addService("http", "tcp", 80);
         ESP_LOGI(TAG, "mDNS started: %s.local", host);
@@ -394,7 +437,8 @@ void WifiManager::startAccessPoint(uint32_t now) {
     IPAddress apIP(192, 168, 4, 1);
     WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
 
-    const char* portalName = getAPSSID();
+    char portalName[sizeof(_currentHostname)];
+    copyAPSSID(portalName, sizeof(portalName));
     bool apResult = WiFi.softAP(portalName);
     ESP_LOGI(TAG, "softAP('%s') returned %s", portalName, apResult ? "true" : "FALSE");
 
@@ -434,12 +478,17 @@ void WifiManager::stopAccessPoint() {
 void WifiManager::tick(uint32_t currentMillis) {
     // --- Handle deferred restart (set by connect/forget handlers) ---
     if (_restartRequested.load()) {
-        _restartRequested.store(false);
+        _restarting.store(true);
         ESP_LOGI(TAG, "Executing deferred restart...");
-        // Allow HTTP response to flush to the client before WiFi reconnect.
-        // Without this delay, the client receives a connection reset because
-        // esp_restart() tears down the TCP stack before the response is sent.
+        // Allow HTTP response to flush to the client before rebooting.
+        // Keep _restartRequested/_restarting latched across delay(500) so
+        // concurrent Core 0 handlers reject new writes cleanly, then hold
+        // _persistOpMutex across esp_restart() so any in-flight LittleFS write
+        // finishes before reset.
         delay(500);
+        std::lock_guard<FreeRTOSMutex> persistLock(_persistOpMutex);
+        _restartRequested.store(false);
+        _restarting.store(false);
         esp_restart();
         return; // Unreachable, but makes intent clear
     }
@@ -447,10 +496,7 @@ void WifiManager::tick(uint32_t currentMillis) {
     // --- Deferred reconnect (triggered by updateWiFi / out-of-band config import) ---
     // Honoured in every state: with the fallback AP the portal is reachable
     // while the state machine cycles StaConnecting/StaBackoff (#236 D-F).
-    // Check _provisioningInProgress first (acquire-release pairs with ProvisioningGuard)
-    // so an in-flight HTTP provisioning save/response or pending restart is never
-    // interrupted by SoftAP teardown.
-    if (!_provisioningInProgress.load() && !_restartRequested.load() && _reconnectRequested.load()) {
+    if (!isProvisioningOrRestarting() && _reconnectRequested.load()) {
         _reconnectRequested.store(false);
         ESP_LOGI(TAG, "Executing deferred reconnect with new credentials...");
         stopAccessPoint();
@@ -473,8 +519,7 @@ void WifiManager::tick(uint32_t currentMillis) {
     // notifyApiActivity → millis()) AFTER currentMillis was captured
     // at tick-start, causing unsigned underflow to ~4.3 billion.
     const uint32_t lastReq = _lastApiRequestTime.load();
-    if (_isAPMode.load() && hasCredentials() &&
-        !_provisioningInProgress.load() && !_restartRequested.load() &&
+    if (_isAPMode.load() && !isProvisioningOrRestarting() && hasCredentials() &&
         currentMillis > lastReq &&
         (currentMillis - lastReq) > AP_INACTIVITY_TIMEOUT_MS) {
         ESP_LOGW(TAG, "Fallback AP inactive for 1 hour. Dropping AP; STA retries continue.");
@@ -496,7 +541,7 @@ void WifiManager::tick(uint32_t currentMillis) {
         }
 
         case WiFiState::StaConnecting:
-            if (_provisioningInProgress.load() || _restartRequested.load()) {
+            if (isProvisioningOrRestarting()) {
                 break;
             }
             if (WiFi.status() == WL_CONNECTED) {
@@ -520,7 +565,7 @@ void WifiManager::tick(uint32_t currentMillis) {
             break;
 
         case WiFiState::StaBackoff:
-            if (_provisioningInProgress.load() || _restartRequested.load()) {
+            if (isProvisioningOrRestarting()) {
                 break;
             }
             // The driver may still re-associate on its own during the wait.
@@ -548,10 +593,7 @@ void WifiManager::tick(uint32_t currentMillis) {
 
         case WiFiState::Ready:
             if (_isAPMode.load()) {
-                // Check _provisioningInProgress before _restartRequested so the
-                // release-acquire chain on _provisioningInProgress guarantees we
-                // observe _restartRequested == true set before ProvisioningGuard exit.
-                if (!_provisioningInProgress.load() && !_restartRequested.load() && hasCredentials()) {
+                if (!isProvisioningOrRestarting() && hasCredentials()) {
                     // Credentials were applied while the setup AP was up
                     // (e.g. config import): leave setup mode via the normal
                     // reconnect path so STA-first applies from here on.
@@ -560,7 +602,7 @@ void WifiManager::tick(uint32_t currentMillis) {
                 }
                 // Setup AP 1-hour inactivity timeout (no credentials only).
                 // Guard: see the underflow note above.
-                if (!_provisioningInProgress.load() && !_restartRequested.load() &&
+                if (!isProvisioningOrRestarting() &&
                     currentMillis > lastReq &&
                     (currentMillis - lastReq) > AP_INACTIVITY_TIMEOUT_MS) {
                     ESP_LOGW(TAG, "AP Mode inactive for 1 hour. Shutting down AP to save power.");
@@ -592,7 +634,7 @@ void WifiManager::tick(uint32_t currentMillis) {
 
         case WiFiState::Shutdown:
             // Reached only from setup mode (no credentials).
-            if (_isAPMode.load() && !_provisioningInProgress.load() && !_restartRequested.load()) {
+            if (_isAPMode.load() && !isProvisioningOrRestarting()) {
                 stopAccessPoint();
                 WiFi.mode(WIFI_OFF);
                 ESP_LOGI(TAG, "WiFi AP has been shut down.");
@@ -748,28 +790,22 @@ void WifiManager::registerMCPTools(MCPToolRegistry& registry) {
         [](void* context, JsonObject& args, JsonObject& result) {
             WifiManager* self = static_cast<WifiManager*>(context);
             ProvisioningGuard guard(*self);
-            {
-                std::lock_guard<FreeRTOSMutex> lock(self->_credMutex);
-                memset(self->_pendingSsid, 0, sizeof(self->_pendingSsid));
-                self->_hasPendingSsid = true;
+            if (guard.blockedByRestart) {
+                result["success"] = false;
+                result["isError"] = true;
+                result["error"] = "Restart already in progress";
+                return;
             }
-
-            if (self->_keyManager != nullptr) {
-                self->_keyManager->deleteKey("wifi_password");
+            if (!self->stageAndPersistErasure()) {
+                result["success"] = false;
+                result["isError"] = true;
+                result["error"] = "Failed to erase WiFi credentials";
+                return;
             }
-
-            if (self->_configManager != nullptr) {
-                self->_configManager->saveModuleConfig(self);
-            }
-
-            {
-                std::lock_guard<FreeRTOSMutex> lock(self->_credMutex);
-                memset(self->_wifiSsid, 0, sizeof(self->_wifiSsid));
-                memset(self->_wifiPass, 0, sizeof(self->_wifiPass));
-                self->_hasPendingSsid = false;
-            }
-
-            WiFi.disconnect(true, true);
+            self->commitStagedErasure();
+            // Do NOT call WiFi.disconnect() here: wifi_forget runs on Core 0
+            // HTTP MCP handler and must keep STA up until the response flushes;
+            // scheduleRestart() + begin() on reboot handles WiFi reset.
             self->scheduleRestart();
             result["success"] = true;
         }, this, true);
@@ -1038,9 +1074,16 @@ esp_err_t WifiManager::handleConnect(PsychicRequest* request, PsychicResponse* r
 
     {
         ProvisioningGuard guard(*this);
+        if (guard.blockedByRestart) {
+            response->send(503, "application/json", "{\"status\":\"error\",\"msg\":\"Restart already in progress\"}");
+            return ESP_FAIL;
+        }
         // Stage and persist credentials without mutating _wifiSsid or setting
         // _reconnectRequested while Core 0 is still writing flash / sending 200.
-        stageAndPersistCredentials(ssid, pass);
+        if (!stageAndPersistCredentials(ssid, pass)) {
+            response->send(500, "application/json", "{\"status\":\"error\",\"msg\":\"Failed to save credentials\"}");
+            return ESP_FAIL;
+        }
 
         response->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Credentials saved. Restarting...\"}");
 
@@ -1074,33 +1117,18 @@ esp_err_t WifiManager::handleForget(PsychicRequest* request, PsychicResponse* re
 
     {
         ProvisioningGuard guard(*this);
-        {
-            std::lock_guard<FreeRTOSMutex> lock(_credMutex);
-            memset(_pendingSsid, 0, sizeof(_pendingSsid));
-            _hasPendingSsid = true;
+        if (guard.blockedByRestart) {
+            response->send(503, "application/json", "{\"status\":\"error\",\"msg\":\"Restart already in progress\"}");
+            return ESP_FAIL;
         }
-
-        // --- Delete encrypted password from KeyManager ---
-        if (_keyManager != nullptr) {
-            _keyManager->deleteKey("wifi_password");
-            ESP_LOGI(TAG, "WiFi password removed from KeyManager");
-        }
-
-        // --- Persist empty config via ConfigManager ---
-        if (_configManager != nullptr) {
-            _configManager->saveModuleConfig(this);
-            ESP_LOGI(TAG, "WiFi config cleared via ConfigManager");
+        if (!stageAndPersistErasure()) {
+            response->send(500, "application/json", "{\"status\":\"error\",\"msg\":\"Failed to erase credentials\"}");
+            return ESP_FAIL;
         }
 
         response->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"WiFi credentials erased. Restarting to AP mode...\"}");
 
-        // --- Clear in-memory credentials after response is sent ---
-        {
-            std::lock_guard<FreeRTOSMutex> lock(_credMutex);
-            memset(_wifiSsid, 0, sizeof(_wifiSsid));
-            memset(_wifiPass, 0, sizeof(_wifiPass));
-            _hasPendingSsid = false;
-        }
+        commitStagedErasure();
 
         // --- Schedule deferred restart to AP mode ---
         this->scheduleRestart();
@@ -1124,7 +1152,7 @@ void WifiManager::scheduleRestart() {
 // Credential Management
 // =============================================================================
 
-void WifiManager::stageAndPersistCredentials(const char* ssid, const char* pass) {
+bool WifiManager::stageAndPersistCredentials(const char* ssid, const char* pass) {
     {
         std::lock_guard<FreeRTOSMutex> guard(_credMutex);
         if (ssid != nullptr) {
@@ -1136,34 +1164,44 @@ void WifiManager::stageAndPersistCredentials(const char* ssid, const char* pass)
         }
     }
 
+    bool ok = true;
     if (pass != nullptr && strlen(pass) > 0) {
         char boundedPass[sizeof(_wifiPass)];
         strlcpy(boundedPass, pass, sizeof(boundedPass));
-        const auto redaction = Redactor::instance().registerSecret(std::string(boundedPass));
+        const auto redaction = Redactor::instance().registerSecret(boundedPass);
         if (redaction == Redactor::RegisterResult::Full ||
             redaction == Redactor::RegisterResult::TooLong) {
             ESP_LOGE(TAG, "WiFi password will NOT be redacted from logs: %s",
                      Redactor::describe(redaction));
         }
 
-        // Persist password via KeyManager (AES-256 encrypted)
+        // Persist password via KeyManager (AES-256 encrypted) using the same
+        // bounded buffer committed to _wifiPass and registered with Redactor.
         if (_keyManager != nullptr) {
-            if (_keyManager->addKey("wifi_password", pass, "WiFi", true, true)) {
+            if (_keyManager->addKey("wifi_password", boundedPass, "WiFi", true, true)) {
                 ESP_LOGI(TAG, "WiFi password persisted via KeyManager");
             } else {
                 ESP_LOGE(TAG, "CRITICAL: Failed to persist WiFi password!");
+                ok = false;
             }
         } else {
-            ESP_LOGW(TAG, "persistCredentials: KeyManager not wired — password not persisted!");
+            ESP_LOGW(TAG, "stageAndPersistCredentials: KeyManager not wired — password not persisted!");
         }
     }
 
     // Persist via ConfigManager gateway (serializeConfig emits _pendingSsid)
-    if (_configManager != nullptr) {
-        _configManager->saveModuleConfig(this);
-    } else {
-        ESP_LOGW(TAG, "persistCredentials: ConfigManager not wired — config not saved!");
+    if (ok) {
+        if (_configManager != nullptr) {
+            if (!_configManager->saveModuleConfig(this)) {
+                ESP_LOGE(TAG, "CRITICAL: Failed to persist WiFi config via ConfigManager!");
+                ok = false;
+            }
+        } else {
+            ESP_LOGW(TAG, "stageAndPersistCredentials: ConfigManager not wired — config not saved!");
+        }
     }
+
+    return ok;
 }
 
 void WifiManager::commitStagedCredentials(const char* pass) {
@@ -1178,6 +1216,47 @@ void WifiManager::commitStagedCredentials(const char* pass) {
     }
 }
 
+bool WifiManager::stageAndPersistErasure() {
+    {
+        std::lock_guard<FreeRTOSMutex> lock(_credMutex);
+        memset(_pendingSsid, 0, sizeof(_pendingSsid));
+        _hasPendingSsid = true;
+    }
+
+    bool ok = true;
+    // --- Delete encrypted password from KeyManager ---
+    if (_keyManager != nullptr) {
+        KeyInfo info;
+        const bool keyExisted = _keyManager->getKeyMetadata("wifi_password", info);
+        if (_keyManager->deleteKey("wifi_password")) {
+            ESP_LOGI(TAG, "WiFi password removed from KeyManager");
+        } else if (keyExisted || hasPassword()) {
+            ESP_LOGE(TAG, "CRITICAL: Failed to delete WiFi password from KeyManager!");
+            ok = false;
+        }
+    }
+
+    // --- Persist empty config via ConfigManager ---
+    if (ok && _configManager != nullptr) {
+        if (_configManager->saveModuleConfig(this)) {
+            ESP_LOGI(TAG, "WiFi config cleared via ConfigManager");
+        } else {
+            ESP_LOGE(TAG, "CRITICAL: Failed to clear WiFi config via ConfigManager!");
+            ok = false;
+        }
+    }
+
+    return ok;
+}
+
+void WifiManager::commitStagedErasure() {
+    std::lock_guard<FreeRTOSMutex> lock(_credMutex);
+    memset(_wifiSsid, 0, sizeof(_wifiSsid));
+    memset(_wifiPass, 0, sizeof(_wifiPass));
+    memset(_pendingSsid, 0, sizeof(_pendingSsid));
+    _hasPendingSsid = false;
+}
+
 /**
  * @brief Save new WiFi credentials and request a deferred reconnect.
  *
@@ -1188,7 +1267,14 @@ void WifiManager::commitStagedCredentials(const char* pass) {
  */
 void WifiManager::updateWiFi(const char* ssid, const char* pass) {
     ProvisioningGuard guard(*this);
-    stageAndPersistCredentials(ssid, pass);
+    if (guard.blockedByRestart) {
+        ESP_LOGW(TAG, "updateWiFi: Restart already pending — ignoring update");
+        return;
+    }
+    if (!stageAndPersistCredentials(ssid, pass)) {
+        ESP_LOGE(TAG, "updateWiFi: Failed to persist credentials — aborting reconnect");
+        return;
+    }
     commitStagedCredentials(pass);
 
     // --- Request deferred reconnect (handled safely in tick()) ---
@@ -1200,6 +1286,10 @@ void WifiManager::updateWiFi(const char* ssid, const char* pass) {
  * @brief Test a WiFi connection without permanently changing stored credentials.
  */
 bool WifiManager::testConnection(const char* ssid, const char* pass, std::string& ipOut) {
+    if (ssid == nullptr || ssid[0] == '\0') {
+        ESP_LOGW(TAG, "WIFI_TEST: Missing SSID");
+        return false;
+    }
     ESP_LOGI(TAG, "WIFI_TEST: Starting connection test...");
     char storedSsid[sizeof(_wifiSsid)];
     char storedPass[sizeof(_wifiPass)];

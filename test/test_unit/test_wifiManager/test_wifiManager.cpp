@@ -17,6 +17,7 @@
 #include "ConfigRoot.hpp"
 #include "DeviceCrypto.hpp"
 #include "KeyManager.hpp"
+#include "MCPToolRegistry.hpp"
 #include "../test_helpers/MockTabRegistry.hpp"
 
 class WifiManagerTest : public ::testing::Test {
@@ -555,12 +556,13 @@ public:
 class EncryptHookDeviceCrypto : public DeviceCrypto {
 public:
     std::function<void()> onEncrypt;
+    bool failEncrypt = false;
 
     std::unique_ptr<char[]> encrypt(const char* plaintext, size_t inputLen, size_t* outLen) override {
         if (onEncrypt) {
             onEncrypt();
         }
-        if (!plaintext || inputLen == 0) {
+        if (failEncrypt || !plaintext || inputLen == 0) {
             if (outLen) *outLen = 0;
             return nullptr;
         }
@@ -612,8 +614,8 @@ protected:
 
     void TearDown() override {
         std::error_code ec;
-        std::filesystem::remove(ConfigRoot::getEtcFilePath("keys.json").c_str(), ec);
-        std::filesystem::remove(ConfigRoot::getModFilePath("wifi").c_str(), ec);
+        std::filesystem::remove_all(ConfigRoot::getEtcFilePath("keys.json").c_str(), ec);
+        std::filesystem::remove_all(ConfigRoot::getModFilePath("wifi").c_str(), ec);
         std::filesystem::remove(ConfigRoot::getEtcFilePath("manifest.json").c_str(), ec);
         std::filesystem::remove(ConfigRoot::getModFilePath("manifest.json").c_str(), ec);
     }
@@ -816,6 +818,12 @@ TEST_F(WifiProvisioningTest, PostForgetStagesErasureUntilHttpResponseCompletes) 
     EXPECT_TRUE(keyDeletedDuringSend);
     EXPECT_FALSE(wifi.hasCredentials());
     EXPECT_FALSE(wifi.hasPassword());
+
+    // Subsequent tick() executes deferred restart rather than emitting AP_STARTED
+    EventCounter counter;
+    bus.subscribe(WifiEvents::WIFI_AP_STARTED, &EventCounter::onApStarted, &counter);
+    wifi.tick(3000);
+    EXPECT_EQ(0, counter.apStarted);
 }
 
 TEST_F(WifiProvisioningTest, UpdateWiFiPreservesDeferredReconnectWithoutMidSaveApTeardown) {
@@ -849,6 +857,264 @@ TEST_F(WifiProvisioningTest, UpdateWiFiPreservesDeferredReconnectWithoutMidSaveA
     wifi.tick(5001); // StaConnecting -> connected (stub)
     EXPECT_TRUE(wifi.isReady());
     EXPECT_EQ(1, counter.connected);
+}
+
+TEST_F(WifiProvisioningTest, StaConnectingGuardSkipsConnectAndInactivityDuringProvisioning) {
+    EventCounter counter;
+    bus.subscribe(WifiEvents::WIFI_CONNECTED, &EventCounter::onConnected, &counter);
+
+    wifi.updateWiFi("OldNet", "oldpass123");
+    wifi.tick(1000); // consume _reconnectRequested -> Init
+    wifi.begin();
+    wifi.tick(2000); // Init -> StaConnecting
+
+    auto connectHandler = findRoute("/api/wifi/connect", HTTP_POST);
+    ASSERT_NE(connectHandler, nullptr);
+
+    int connectedDuringEncrypt = -1;
+    bool ssidOldDuringEncrypt = false;
+    crypto.onEncrypt = [&]() {
+        // WiFi.status() == WL_CONNECTED in native stub, but StaConnecting must
+        // skip onStaConnected while provisioning is in flight.
+        wifi.tick(2500);
+        connectedDuringEncrypt = counter.connected;
+        ssidOldDuringEncrypt = (std::string(wifi.getSSID()) == "OldNet");
+    };
+
+    int connectedDuringSend = -1;
+    MockWifiHttpRequest req("{\"ssid\":\"NewNet\",\"pass\":\"newpass123\"}");
+    MockWifiHttpResponse resp;
+    resp.onSend = [&]() {
+        wifi.tick(2600);
+        connectedDuringSend = counter.connected;
+    };
+
+    EXPECT_EQ(ESP_OK, connectHandler(&req, &resp));
+    EXPECT_EQ(200, resp.lastCode);
+    EXPECT_EQ(0, connectedDuringEncrypt);
+    EXPECT_TRUE(ssidOldDuringEncrypt);
+    EXPECT_EQ(0, connectedDuringSend);
+    EXPECT_STREQ("NewNet", wifi.getSSID());
+
+    // Next tick() executes deferred restart, not onStaConnected
+    wifi.tick(2700);
+    EXPECT_EQ(0, counter.connected);
+}
+
+TEST_F(WifiProvisioningTest, FallbackApInactivityGuardSkippedWhileProvisioning) {
+    wifi.begin();
+    wifi.tick(2000);
+    wifi.tick(2001); // Setup AP ready at t=2001 (_lastApiRequestTime = 2001)
+    ASSERT_TRUE(wifi.getAPMode());
+
+    auto connectHandler = findRoute("/api/wifi/connect", HTTP_POST);
+    ASSERT_NE(connectHandler, nullptr);
+
+    bool apAlivePastTimeout = false;
+    crypto.onEncrypt = [&]() {
+        // Advance beyond 1h inactivity timeout while provisioning is in progress
+        wifi.tick(4000000);
+        wifi.tick(4000001);
+        apAlivePastTimeout = wifi.getAPMode();
+    };
+
+    MockWifiHttpRequest req("{\"ssid\":\"HomeNet\",\"pass\":\"secret123\"}");
+    MockWifiHttpResponse resp;
+    EXPECT_EQ(ESP_OK, connectHandler(&req, &resp));
+    EXPECT_TRUE(apAlivePastTimeout);
+}
+
+TEST_F(WifiProvisioningTest, McpWifiForgetErasesCredentialsAndDefersRestart) {
+    MCPToolRegistry registry;
+    wifi.registerMCPTools(registry);
+    const MCPToolEntry* forgetTool = registry.findTool("wifi_forget");
+    ASSERT_NE(forgetTool, nullptr);
+
+    wifi.updateWiFi("HomeNet", "secret123");
+    wifi.tick(2000); // consume _reconnectRequested
+
+    EventCounter counter;
+    bus.subscribe(WifiEvents::WIFI_AP_STARTED, &EventCounter::onApStarted, &counter);
+
+    JsonDocument argsDoc;
+    JsonObject args = argsDoc.to<JsonObject>();
+    JsonDocument resDoc;
+    JsonObject res = resDoc.to<JsonObject>();
+    forgetTool->handler(forgetTool->context, args, res);
+
+    EXPECT_TRUE(res["success"].as<bool>());
+    EXPECT_TRUE(res["isError"].isNull());
+    EXPECT_FALSE(wifi.hasCredentials());
+    EXPECT_FALSE(wifi.hasPassword());
+    EXPECT_TRUE(keyManager.getKeyById("wifi_password").empty());
+
+    // Subsequent tick runs deferred restart rather than ApStarting
+    wifi.tick(3000);
+    EXPECT_EQ(0, counter.apStarted);
+}
+
+TEST_F(WifiProvisioningTest, PersistenceFailureFailsClosedWithoutRamCommitOrReboot) {
+    auto connectHandler = findRoute("/api/wifi/connect", HTTP_POST);
+    auto forgetHandler = findRoute("/api/wifi/forget", HTTP_POST);
+    ASSERT_NE(connectHandler, nullptr);
+    ASSERT_NE(forgetHandler, nullptr);
+
+    // 1. KeyManager encryption failure during handleConnect
+    crypto.failEncrypt = true;
+    {
+        MockWifiHttpRequest req("{\"ssid\":\"HomeNet\",\"pass\":\"secret123\"}");
+        MockWifiHttpResponse resp;
+        EXPECT_EQ(ESP_FAIL, connectHandler(&req, &resp));
+        EXPECT_EQ(500, resp.lastCode);
+    }
+    crypto.failEncrypt = false;
+    EXPECT_FALSE(wifi.hasCredentials());
+    EXPECT_FALSE(wifi.hasPassword());
+    {
+        JsonDocument secDoc;
+        JsonObject sec = secDoc.to<JsonObject>();
+        wifi.serializeConfig(sec);
+        EXPECT_STREQ("", sec["ssid"].as<const char*>());
+    }
+
+    // 2. ConfigManager save failure during handleConnect (replace wifi.json with directory)
+    {
+        std::error_code ec;
+        std::filesystem::remove(ConfigRoot::getModFilePath("wifi").c_str(), ec);
+        std::filesystem::create_directory(ConfigRoot::getModFilePath("wifi").c_str(), ec);
+        MockWifiHttpRequest req("{\"ssid\":\"HomeNet\",\"pass\":\"secret123\"}");
+        MockWifiHttpResponse resp;
+        EXPECT_EQ(ESP_FAIL, connectHandler(&req, &resp));
+        EXPECT_EQ(500, resp.lastCode);
+        EXPECT_FALSE(wifi.hasCredentials());
+        std::filesystem::remove_all(ConfigRoot::getModFilePath("wifi").c_str(), ec);
+    }
+
+    // 3. Seed valid credentials, then fail ConfigManager during handleForget & MCP wifi_forget
+    wifi.updateWiFi("StableNet", "stablepass");
+    wifi.tick(2000);
+    ASSERT_TRUE(wifi.hasCredentials());
+
+    {
+        std::error_code ec;
+        std::filesystem::remove(ConfigRoot::getModFilePath("wifi").c_str(), ec);
+        std::filesystem::create_directory(ConfigRoot::getModFilePath("wifi").c_str(), ec);
+
+        MockWifiHttpRequest req("{}");
+        MockWifiHttpResponse resp;
+        EXPECT_EQ(ESP_FAIL, forgetHandler(&req, &resp));
+        EXPECT_EQ(500, resp.lastCode);
+        EXPECT_STREQ("StableNet", wifi.getSSID());
+        EXPECT_TRUE(wifi.hasCredentials());
+
+        MCPToolRegistry registry;
+        wifi.registerMCPTools(registry);
+        const MCPToolEntry* forgetTool = registry.findTool("wifi_forget");
+        ASSERT_NE(forgetTool, nullptr);
+        JsonDocument argsDoc, resDoc;
+        JsonObject args = argsDoc.to<JsonObject>();
+        JsonObject res = resDoc.to<JsonObject>();
+        forgetTool->handler(forgetTool->context, args, res);
+        EXPECT_FALSE(res["success"].as<bool>());
+        EXPECT_TRUE(res["isError"].as<bool>());
+        EXPECT_STREQ("StableNet", wifi.getSSID());
+
+        std::filesystem::remove_all(ConfigRoot::getModFilePath("wifi").c_str(), ec);
+    }
+}
+
+TEST_F(WifiProvisioningTest, PostForgetSucceedsForOpenNetworkWithoutPasswordKey) {
+    auto connectHandler = findRoute("/api/wifi/connect", HTTP_POST);
+    auto forgetHandler = findRoute("/api/wifi/forget", HTTP_POST);
+    ASSERT_NE(connectHandler, nullptr);
+    ASSERT_NE(forgetHandler, nullptr);
+
+    MockWifiHttpRequest connReq("{\"ssid\":\"OpenCafe\",\"pass\":\"\"}");
+    MockWifiHttpResponse connResp;
+    EXPECT_EQ(ESP_OK, connectHandler(&connReq, &connResp));
+    EXPECT_EQ(200, connResp.lastCode);
+    wifi.tick(2500); // clear _restartRequested
+
+    MockWifiHttpRequest forgetReq("{}");
+    MockWifiHttpResponse forgetResp;
+    EXPECT_EQ(ESP_OK, forgetHandler(&forgetReq, &forgetResp));
+    EXPECT_EQ(200, forgetResp.lastCode);
+    EXPECT_FALSE(wifi.hasCredentials());
+}
+
+TEST_F(WifiProvisioningTest, ConcurrentRequestsRejectedWhileRestartPendingAndOversizedPasswordBounded) {
+    auto connectHandler = findRoute("/api/wifi/connect", HTTP_POST);
+    auto forgetHandler = findRoute("/api/wifi/forget", HTTP_POST);
+    ASSERT_NE(connectHandler, nullptr);
+    ASSERT_NE(forgetHandler, nullptr);
+
+    // 70-char password exceeds char _wifiPass[65] (64 chars max); KeyManager must store
+    // the exact 64-char truncated value matching _wifiPass.
+    std::string longPass(70, 'A');
+    std::string expectedPass(64, 'A');
+    MockWifiHttpRequest req(std::string("{\"ssid\":\"HomeNet\",\"pass\":\"") + longPass + "\"}");
+    MockWifiHttpResponse resp;
+    EXPECT_EQ(ESP_OK, connectHandler(&req, &resp));
+    EXPECT_EQ(200, resp.lastCode);
+    EXPECT_EQ(expectedPass, keyManager.getKeyById("wifi_password"));
+
+    // While _restartRequested is still pending (before tick() runs), follow-up
+    // connect/forget/MCP/updateWiFi calls are rejected cleanly.
+    {
+        MockWifiHttpRequest req2("{\"ssid\":\"OtherNet\",\"pass\":\"pass1234\"}");
+        MockWifiHttpResponse resp2;
+        EXPECT_EQ(ESP_FAIL, connectHandler(&req2, &resp2));
+        EXPECT_EQ(503, resp2.lastCode);
+    }
+    {
+        MockWifiHttpRequest fReq("{}");
+        MockWifiHttpResponse fResp;
+        EXPECT_EQ(ESP_FAIL, forgetHandler(&fReq, &fResp));
+        EXPECT_EQ(503, fResp.lastCode);
+    }
+    {
+        MCPToolRegistry registry;
+        wifi.registerMCPTools(registry);
+        const MCPToolEntry* forgetTool = registry.findTool("wifi_forget");
+        ASSERT_NE(forgetTool, nullptr);
+        JsonDocument argsDoc, resDoc;
+        JsonObject args = argsDoc.to<JsonObject>();
+        JsonObject res = resDoc.to<JsonObject>();
+        forgetTool->handler(forgetTool->context, args, res);
+        EXPECT_TRUE(res["isError"].as<bool>());
+    }
+    wifi.updateWiFi("IgnoredNet", "ignored123");
+    EXPECT_STREQ("HomeNet", wifi.getSSID());
+}
+
+TEST_F(WifiProvisioningTest, CopyAccessorsAndTestConnectionNullGuard) {
+    wifi.setDefaultHostname("my-sensor");
+    wifi.updateWiFi("MyLongNetworkName", "secret123");
+    wifi.tick(2000);
+
+    char buf[33] = {};
+    wifi.copySSID(buf, sizeof(buf));
+    EXPECT_STREQ("MyLongNetworkName", buf);
+    wifi.copyHostname(buf, sizeof(buf));
+    EXPECT_STREQ("my-sensor", buf);
+    wifi.copyDefaultHostname(buf, sizeof(buf));
+    EXPECT_STREQ("my-sensor", buf);
+    wifi.copyAPSSID(buf, sizeof(buf));
+    EXPECT_STREQ("my-sensor", buf);
+
+    char tiny[5] = {};
+    wifi.copySSID(tiny, sizeof(tiny));
+    EXPECT_STREQ("MyLo", tiny);
+
+    // Null/zero-length buffer guards must not crash
+    wifi.copySSID(nullptr, 10);
+    wifi.copyHostname(buf, 0);
+    wifi.copyDefaultHostname(nullptr, 0);
+    wifi.copyAPSSID(buf, 0);
+
+    std::string ipOut;
+    EXPECT_FALSE(wifi.testConnection(nullptr, "pass", ipOut));
+    EXPECT_FALSE(wifi.testConnection("", "pass", ipOut));
 }
 
 int main(int argc, char **argv) {

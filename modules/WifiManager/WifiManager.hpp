@@ -154,6 +154,7 @@ private:
 
     std::atomic<bool> _reconnectRequested{false};     ///< Deferred reconnect flag (set by updateWiFi/Ready, acted on by tick)
     std::atomic<bool> _restartRequested{false};       ///< Deferred restart flag (set by connect/forget, acted on by tick)
+    std::atomic<bool> _restarting{false};             ///< Latched while tick() flushes HTTP response before esp_restart()
     std::atomic<bool> _provisioningInProgress{false}; ///< True while credential persistence & HTTP response are in flight
 
     ConfigManager* _configManager = nullptr; ///< Pointer to ConfigManager for save operations
@@ -165,9 +166,19 @@ private:
     struct ProvisioningGuard;
     friend struct ProvisioningGuard;
 
-    void stageAndPersistCredentials(const char* ssid, const char* pass);
+    bool stageAndPersistCredentials(const char* ssid, const char* pass);
     void commitStagedCredentials(const char* pass);
+    bool stageAndPersistErasure();
+    void commitStagedErasure();
     void clearPendingSsid();
+    bool isRestartPending() const {
+        return _restartRequested.load() || _restarting.load();
+    }
+    bool isProvisioningOrRestarting() const {
+        // Read _provisioningInProgress before _restartRequested/_restarting so the
+        // release-acquire chain guarantees Core 1 observes _restartRequested == true.
+        return _provisioningInProgress.load() || _restartRequested.load() || _restarting.load();
+    }
 
     void transitionTo(WiFiState newState, uint32_t now);
     void processDNS();
@@ -371,13 +382,33 @@ public:
     void setDefaultHostname(const char* hostname);
 
     /**
+     * @brief Copy the app-supplied factory default hostname under _credMutex.
+     * @param buf Destination buffer.
+     * @param len Size of destination buffer in bytes.
+     */
+    void copyDefaultHostname(char* buf, size_t len) const;
+
+    /**
+     * @brief Copy the effective hostname (persisted or factory default) under _credMutex.
+     * @param buf Destination buffer.
+     * @param len Size of destination buffer in bytes.
+     */
+    void copyHostname(char* buf, size_t len) const;
+
+    /**
      * @brief Returns the app-supplied factory default hostname.
+     * @note Single-threaded boot / unit-test convenience accessor returning an
+     *       internal buffer pointer without locking; cross-core callers must use
+     *       copyDefaultHostname().
      * @return Default hostname string.
      */
     const char* getDefaultHostname() const { return _defaultHostname; }
 
     /**
      * @brief Returns the current effective hostname (persisted value or factory default).
+     * @note Single-threaded boot / unit-test convenience accessor returning an
+     *       internal buffer pointer without locking; cross-core callers must use
+     *       copyHostname().
      * @return Current hostname string.
      */
     const char* getHostname() const {
@@ -462,7 +493,17 @@ public:
     }
 
     /**
+     * @brief Copy the current stored SSID into a caller-owned buffer under _credMutex.
+     * @param buf Destination buffer.
+     * @param len Size of destination buffer in bytes.
+     */
+    void copySSID(char* buf, size_t len) const;
+
+    /**
      * @brief Returns the current stored SSID.
+     * @note Single-threaded boot / unit-test convenience accessor returning an
+     *       internal buffer pointer without locking; cross-core callers must use
+     *       copySSID().
      * @return current SSID
      */
     const char* getSSID() const { return _wifiSsid; }
@@ -477,7 +518,17 @@ public:
     }
 
     /**
+     * @brief Copy the captive portal SoftAP SSID into a caller-owned buffer under _credMutex.
+     * @param buf Destination buffer.
+     * @param len Size of destination buffer in bytes.
+     */
+    void copyAPSSID(char* buf, size_t len) const;
+
+    /**
      * @brief Returns the SSID of the AP mode captive portal network.
+     * @note Single-threaded boot / unit-test convenience accessor returning an
+     *       internal buffer pointer without locking; cross-core callers must use
+     *       copyAPSSID().
      * @return AP SSID (effective hostname or "ESP32-Setup")
      */
     const char* getAPSSID() const {

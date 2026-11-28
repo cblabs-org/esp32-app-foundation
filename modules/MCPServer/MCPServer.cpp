@@ -233,11 +233,15 @@ void MCPServer::_handleInitialize(const JsonDocument& req, Print& out) {
 
     // Server identity uses configured app name, WifiManager hostname, or default
     JsonObject serverInfo = result["serverInfo"].to<JsonObject>();
+    char wifiHost[33] = {};
     const char* serverName = "esp32-app-foundation";
     if (_appName[0] != '\0') {
         serverName = _appName;
-    } else if (_wifiManager && _wifiManager->getHostname() && _wifiManager->getHostname()[0] != '\0') {
-        serverName = _wifiManager->getHostname();
+    } else if (_wifiManager) {
+        _wifiManager->copyHostname(wifiHost, sizeof(wifiHost));
+        if (wifiHost[0] != '\0') {
+            serverName = wifiHost;
+        }
     }
     serverInfo["name"]    = serverName;
     serverInfo["version"] = BUILD_VERSION;
@@ -475,7 +479,9 @@ void MCPServer::registerRoutes(PsychicHttpServer& server) {
         doc["enabled"]     = _mcpEnabled;
         doc["readOnly"]    = _mcpReadOnly;
         if (_wifiManager) {
-            doc["hostname"] = _wifiManager->getHostname();
+            char wifiHost[33] = {};
+            _wifiManager->copyHostname(wifiHost, sizeof(wifiHost));
+            doc["hostname"] = wifiHost;
         }
         std::string output;
         serializeJson(doc, output);
